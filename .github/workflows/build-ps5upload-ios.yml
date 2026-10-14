@@ -1,7 +1,6 @@
+
 name: Build PS5Upload iOS 16 (unsigned)
 
-# Community build of the original PS5Upload v7.0.22 source.
-# No signing keys or paid Apple Developer account needed to build the IPA.
 on:
   workflow_dispatch:
 
@@ -27,12 +26,11 @@ jobs:
           set -euo pipefail
           sudo apt-get update
           sudo apt-get install -y curl ca-certificates python3 unzip make git
-          # Match the official PS5Upload release's LLVM 22 toolchain.
           curl -fsSL --retry 3 https://apt.llvm.org/llvm.sh -o /tmp/llvm.sh
           sudo bash /tmp/llvm.sh 22
           sudo apt-get install -y clang-22 llvm-22-dev lld-22
 
-      - name: Install checksum-verified PS5 SDK and SQLite sources
+      - name: Install PS5 SDK and SQLite sources
         run: sudo env PS5_SDK_INSTALL_DIR=/opt/ps5-payload-sdk bash upstream/scripts/install-ps5-sdk.sh
 
       - name: Compile PS5 payload and installer daemon
@@ -47,7 +45,6 @@ jobs:
           test -s payload/ps5upload.elf.gz
           test -s payload/installer/ps5upload-installer.elf.gz
           gzip -t payload/ps5upload.elf.gz payload/installer/ps5upload-installer.elf.gz
-          file payload/ps5upload.elf payload/installer/ps5upload-installer.elf
 
       - name: Stage payload for macOS build
         run: |
@@ -73,6 +70,8 @@ jobs:
     env:
       CI: "true"
       CARGO_TERM_COLOR: always
+      RUSTFLAGS: "-C link-arg=-lc++"
+
     steps:
       - name: Checkout this build kit
         uses: actions/checkout@v4
@@ -114,7 +113,7 @@ jobs:
           cache: npm
           cache-dependency-path: upstream/client/package-lock.json
 
-      - name: Setup Rust for real iPhones (not simulator)
+      - name: Setup Rust for real iPhones
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-apple-ios
