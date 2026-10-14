@@ -1,0 +1,8 @@
+{
+  "identifier": "io.github.ps5upload.ioscommunity",
+  "bundle": {
+    "iOS": {
+      "minimumSystemVersion": "16.0"
+    }
+  }
+}
