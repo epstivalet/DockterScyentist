@@ -1,0 +1,203 @@
+name: Build PS5Upload iOS 16 (unsigned)
+
+# Experimental build of the original PS5Upload v7.0.22 source (v5: complete workflow + direct C++ link).
+# No signing keys or paid Apple Developer account needed to build the IPA.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  payload:
+    name: Build genuine PS5 payload
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - name: Checkout upstream PS5Upload v7.0.22
+        uses: actions/checkout@v4
+        with:
+          repository: phantomptr/ps5upload
+          ref: v7.0.22
+          path: upstream
+          persist-credentials: false
+
+      - name: Install PS5 payload build tools
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y curl ca-certificates python3 unzip make git
+          # Match the official PS5Upload release's LLVM 22 toolchain.
+          curl -fsSL --retry 3 https://apt.llvm.org/llvm.sh -o /tmp/llvm.sh
+          sudo bash /tmp/llvm.sh 22
+          sudo apt-get install -y clang-22 llvm-22-dev lld-22
+
+      - name: Install checksum-verified PS5 SDK and SQLite sources
+        run: sudo env PS5_SDK_INSTALL_DIR=/opt/ps5-payload-sdk bash upstream/scripts/install-ps5-sdk.sh
+
+      - name: Compile PS5 payload and installer daemon
+        working-directory: upstream
+        env:
+          PS5_PAYLOAD_SDK: /opt/ps5-payload-sdk
+          LLVM_CONFIG: /usr/bin/llvm-config-22
+        run: |
+          set -euo pipefail
+          make payload
+          gzip -kf payload/ps5upload.elf payload/installer/ps5upload-installer.elf
+          test -s payload/ps5upload.elf.gz
+          test -s payload/installer/ps5upload-installer.elf.gz
+          gzip -t payload/ps5upload.elf.gz payload/installer/ps5upload-installer.elf.gz
+          file payload/ps5upload.elf payload/installer/ps5upload-installer.elf
+
+      - name: Stage payload for macOS build
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/ps5upload-payload/installer
+          cp upstream/payload/ps5upload.elf.gz /tmp/ps5upload-payload/
+          cp upstream/payload/installer/ps5upload-installer.elf.gz /tmp/ps5upload-payload/installer/
+          tar czf ps5upload-payload.tar.gz -C /tmp/ps5upload-payload .
+
+      - name: Transfer verified payload to iOS build
+        uses: actions/upload-artifact@v4
+        with:
+          name: PS5-payloads-v7.0.22
+          path: ps5upload-payload.tar.gz
+          if-no-files-found: error
+          retention-days: 7
+
+  ios:
+    name: Compile native iPhone app (arm64)
+    needs: payload
+    runs-on: macos-15
+    timeout-minutes: 120
+    env:
+      CI: "true"
+      CARGO_TERM_COLOR: always
+    steps:
+      - name: Checkout this build kit
+        uses: actions/checkout@v4
+        with:
+          path: builder
+          persist-credentials: false
+
+      - name: Checkout upstream PS5Upload v7.0.22
+        uses: actions/checkout@v4
+        with:
+          repository: phantomptr/ps5upload
+          ref: v7.0.22
+          path: upstream
+          persist-credentials: false
+
+      - name: Get PS5 helper payload
+        uses: actions/download-artifact@v4
+        with:
+          name: PS5-payloads-v7.0.22
+          path: downloaded-payload
+
+      - name: Restore PS5 helper payload
+        run: |
+          set -euo pipefail
+          tar xzf downloaded-payload/ps5upload-payload.tar.gz -C upstream/payload
+          gzip -t upstream/payload/ps5upload.elf.gz
+          gzip -t upstream/payload/installer/ps5upload-installer.elf.gz
+
+      - name: Select Xcode and confirm iPhone SDK
+        run: |
+          xcodebuild -version
+          xcrun --sdk iphoneos --show-sdk-version
+          xcode-select -p
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: upstream/client/package-lock.json
+
+      - name: Setup Rust for real iPhones (not simulator)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios
+
+      - name: Install Xcode project generator and CocoaPods
+        run: |
+          set -euo pipefail
+          if ! command -v xcodegen >/dev/null; then brew install xcodegen; fi
+          if ! command -v pod >/dev/null; then brew install cocoapods; fi
+          xcodegen --version
+          pod --version
+
+      - name: Install locked client dependencies
+        working-directory: upstream/client
+        run: npm ci
+
+      - name: Link Apple's C++ runtime directly from the iOS crate
+        run: |
+          set -euo pipefail
+          python3 - <<'PYTHON'
+          from pathlib import Path
+          path = Path("upstream/client/src-tauri/src/lib.rs")
+          content = path.read_text()
+          marker = "mod linux_gpu;"
+          lines = [
+              '// iOS: vendored UnRAR contains native C++ code.',
+              '// Link libc++ directly from the compiled iOS Rust library.',
+              '#[cfg(target_os = "ios")]',
+              '#[link(name = "c++", kind = "dylib")]',
+              'unsafe extern "C" {}',
+              '',
+          ]
+          patch = "\n".join(lines) + "\n"
+          if content.count(marker) != 1:
+              raise SystemExit("Expected marker not found exactly once in lib.rs")
+          if '#[link(name = "c++", kind = "dylib")]' in content:
+              raise SystemExit("iOS libc++ link directive already present")
+          path.write_text(content.replace(marker, patch + marker, 1))
+          print("Inserted native iOS libc++ link directive into src/lib.rs")
+          PYTHON
+          grep -n -A 5 'UnRAR contains native C++ code' upstream/client/src-tauri/src/lib.rs
+
+      - name: Apply iOS-specific app identity and LAN permissions
+        run: |
+          set -euo pipefail
+          cp builder/ios/Info.ios.plist upstream/client/src-tauri/Info.ios.plist
+          cp builder/ios/tauri.ios.conf.json upstream/client/src-tauri/tauri.ios.conf.json
+          /usr/libexec/PlistBuddy -c 'Print NSLocalNetworkUsageDescription' upstream/client/src-tauri/Info.ios.plist
+          python3 -m json.tool upstream/client/src-tauri/tauri.ios.conf.json >/dev/null
+
+      - name: Generate the iOS Xcode project
+        working-directory: upstream/client
+        run: npx tauri ios init --ci
+
+      - name: Build an UNSIGNED device IPA for arm64
+        working-directory: upstream/client
+        run: |
+          set -euo pipefail
+          npx tauri ios build --ci --no-sign
+
+      - name: Validate produced IPA and iOS 16 deployment target
+        run: |
+          set -euo pipefail
+          IPA="$(find upstream/client/src-tauri/gen/apple/build -type f -name '*.ipa' -print -quit)"
+          test -n "$IPA" && test -s "$IPA"
+          echo "IPA found: $IPA"
+          unzip -t "$IPA" | tail -n 2
+          unzip -Z1 "$IPA" | grep -E '^Payload/[^/]+\.app/Info.plist$'
+          mkdir -p /tmp/ipa-inspect
+          ditto -x -k "$IPA" /tmp/ipa-inspect
+          APP="$(find /tmp/ipa-inspect/Payload -maxdepth 1 -type d -name '*.app' -print -quit)"
+          test -n "$APP"
+          /usr/libexec/PlistBuddy -c 'Print :MinimumOSVersion' "$APP/Info.plist"
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Info.plist"
+          EXEC_NAME=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$APP/Info.plist")
+          file "$APP/$EXEC_NAME"
+          lipo -info "$APP/$EXEC_NAME" | grep arm64
+          echo "Unsigned iPhone IPA created: $IPA"
+
+      - name: Upload unsigned iPhone IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: PS5Upload-v7.0.22-iOS16-unsigned-IPA
+          path: upstream/client/src-tauri/gen/apple/build/**/*.ipa
+          if-no-files-found: error
+          retention-days: 14
