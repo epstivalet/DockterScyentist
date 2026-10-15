@@ -1,65 +1,4 @@
-
-name: Build PS5Upload iOS 16 (unsigned)
-
-on:
-  workflow_dispatch:
-
-permissions:
-  contents: read
-
-jobs:
-  payload:
-    name: Build genuine PS5 payload
-    runs-on: ubuntu-24.04
-    timeout-minutes: 35
-    steps:
-      - name: Checkout upstream PS5Upload v7.0.22
-        uses: actions/checkout@v4
-        with:
-          repository: phantomptr/ps5upload
-          ref: v7.0.22
-          path: upstream
-          persist-credentials: false
-
-      - name: Install PS5 payload build tools
-        run: |
-          set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install -y curl ca-certificates python3 unzip make git
-          curl -fsSL --retry 3 https://apt.llvm.org/llvm.sh -o /tmp/llvm.sh
-          sudo bash /tmp/llvm.sh 22
-          sudo apt-get install -y clang-22 llvm-22-dev lld-22
-
-      - name: Install PS5 SDK and SQLite sources
-        run: sudo env PS5_SDK_INSTALL_DIR=/opt/ps5-payload-sdk bash upstream/scripts/install-ps5-sdk.sh
-
-      - name: Compile PS5 payload and installer daemon
-        working-directory: upstream
-        env:
-          PS5_PAYLOAD_SDK: /opt/ps5-payload-sdk
-          LLVM_CONFIG: /usr/bin/llvm-config-22
-        run: |
-          set -euo pipefail
-          make payload
-          gzip -kf payload/ps5upload.elf payload/installer/ps5upload-installer.elf
-          test -s payload/ps5upload.elf.gz
-          test -s payload/installer/ps5upload-installer.elf.gz
-          gzip -t payload/ps5upload.elf.gz payload/installer/ps5upload-installer.elf.gz
-
-      - name: Stage payload for macOS build
-        run: |
-          set -euo pipefail
-          mkdir -p /tmp/ps5upload-payload/installer
-          cp upstream/payload/ps5upload.elf.gz /tmp/ps5upload-payload/
-          cp upstream/payload/installer/ps5upload-installer.elf.gz /tmp/ps5upload-payload/installer/
-          tar czf ps5upload-payload.tar.gz -C /tmp/ps5upload-payload .
-
-      - name: Transfer verified payload to iOS build
-        uses: actions/upload-artifact@v4
-        with:
-          name: PS5-payloads-v7.0.22
-          path: ps5upload-payload.tar.gz
-          if-no-files-found: error
+if-no-files-found: error
           retention-days: 7
 
   ios:
@@ -70,8 +9,6 @@ jobs:
     env:
       CI: "true"
       CARGO_TERM_COLOR: always
-      RUSTFLAGS: "-C link-arg=-lc++"
-
     steps:
       - name: Checkout this build kit
         uses: actions/checkout@v4
@@ -113,7 +50,7 @@ jobs:
           cache: npm
           cache-dependency-path: upstream/client/package-lock.json
 
-      - name: Setup Rust for real iPhones
+      - name: Setup Rust for real iPhones (not simulator)
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-apple-ios
@@ -129,6 +66,21 @@ jobs:
       - name: Install locked client dependencies
         working-directory: upstream/client
         run: npm ci
+
+      - name: Fix iOS C++ linker dependency in Rust build script
+        run: |
+          set -euo pipefail
+          python3 - <<'PYTHON'
+          from pathlib import Path
+          path = Path("upstream/client/src-tauri/build.rs")
+          content = path.read_text()
+          needle = "    if target_os == \"android\" || target_os == \"ios\" {\n        return;\n    }"
+          patch = "    if target_os == \"ios\" {\n        println!(\"cargo:rustc-link-lib=dylib=c++\");\n    }\n"
+          if content.count(needle) != 1:
+              raise SystemExit("Upstream build.rs changed: refusing to patch unknown content")
+          path.write_text(content.replace(needle, patch + needle))
+          print("Applied iOS libc++ link directive to upstream build.rs")
+          PYTHON
 
       - name: Apply iOS-specific app identity and LAN permissions
         run: |
