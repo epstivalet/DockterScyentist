@@ -1,6 +1,6 @@
 name: Build PS5Upload iOS 16 (unsigned)
 
-# Experimental build of the original PS5Upload v7.0.22 source (v4: direct C++ link).
+# Experimental build of the original PS5Upload v7.0.22 source (v5: complete workflow + direct C++ link).
 # No signing keys or paid Apple Developer account needed to build the IPA.
 on:
   workflow_dispatch:
