@@ -1,9 +1,14 @@
 name: Build PS5Upload iOS 16 (unsigned)
 
-# Experimental build of the original PS5Upload v7.0.26 source (v7.0.26: complete workflow + direct C++ link).
+# Experimental build of the original PS5Upload v7.0.33 source (v7.0.33: complete workflow + direct C++ link).
 # No signing keys or paid Apple Developer account needed to build the IPA.
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/build-ps5upload-ios.yml'
+      - 'ios/sweet-tooth.png'
 
 permissions:
   contents: read
@@ -14,11 +19,11 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 35
     steps:
-      - name: Checkout upstream PS5Upload v7.0.26
+      - name: Checkout upstream PS5Upload v7.0.33
         uses: actions/checkout@v4
         with:
           repository: phantomptr/ps5upload
-          ref: v7.0.26
+          ref: v7.0.33
           path: upstream
           persist-credentials: false
 
@@ -60,7 +65,7 @@ jobs:
       - name: Transfer verified payload to iOS build
         uses: actions/upload-artifact@v4
         with:
-          name: PS5-payloads-v7.0.26
+          name: PS5-payloads-v7.0.33
           path: ps5upload-payload.tar.gz
           if-no-files-found: error
           retention-days: 7
@@ -80,18 +85,18 @@ jobs:
           path: builder
           persist-credentials: false
 
-      - name: Checkout upstream PS5Upload v7.0.26
+      - name: Checkout upstream PS5Upload v7.0.33
         uses: actions/checkout@v4
         with:
           repository: phantomptr/ps5upload
-          ref: v7.0.26
+          ref: v7.0.33
           path: upstream
           persist-credentials: false
 
       - name: Get PS5 helper payload
         uses: actions/download-artifact@v4
         with:
-          name: PS5-payloads-v7.0.26
+          name: PS5-payloads-v7.0.33
           path: downloaded-payload
 
       - name: Restore PS5 helper payload
@@ -169,6 +174,22 @@ jobs:
         working-directory: upstream/client
         run: npx tauri ios init --ci
 
+      - name: Generate Sweet Tooth iOS application icon
+        working-directory: upstream/client
+        run: |
+          set -euo pipefail
+          SOURCE_ICON="../../builder/ios/sweet-tooth.png"
+          test -s "$SOURCE_ICON"
+          # Reuse the exact approved artwork, generating only required iOS sizes.
+          npx tauri icon "$SOURCE_ICON" --output src-tauri/icons
+          APP_ICONS="src-tauri/gen/apple/Assets.xcassets/AppIcon.appiconset"
+          test -d "$APP_ICONS"
+          test -s src-tauri/icons/ios/AppIcon-512@2x.png
+          cp src-tauri/icons/ios/AppIcon-*.png "$APP_ICONS/"
+          test -s "$APP_ICONS/AppIcon-60x60@3x.png"
+          test -s "$APP_ICONS/AppIcon-512@2x.png"
+          sips -g pixelWidth -g pixelHeight "$APP_ICONS/AppIcon-512@2x.png"
+
       - name: Build an UNSIGNED device IPA for arm64
         working-directory: upstream/client
         run: |
@@ -187,6 +208,7 @@ jobs:
           ditto -x -k "$IPA" /tmp/ipa-inspect
           APP="$(find /tmp/ipa-inspect/Payload -maxdepth 1 -type d -name '*.app' -print -quit)"
           test -n "$APP"
+          test -s "$APP/Assets.car"
           /usr/libexec/PlistBuddy -c 'Print :MinimumOSVersion' "$APP/Info.plist"
           /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Info.plist"
           EXEC_NAME=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$APP/Info.plist")
@@ -197,7 +219,7 @@ jobs:
       - name: Upload unsigned iPhone IPA
         uses: actions/upload-artifact@v4
         with:
-          name: PS5Upload-v7.0.26-iOS16-unsigned-IPA
+          name: PS5Upload-v7.0.33-iOS16-unsigned-IPA
           path: upstream/client/src-tauri/gen/apple/build/**/*.ipa
           if-no-files-found: error
           retention-days: 14
