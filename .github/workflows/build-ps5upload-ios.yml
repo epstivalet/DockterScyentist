@@ -126,3 +126,78 @@ jobs:
           if ! command -v pod >/dev/null; then brew install cocoapods; fi
           xcodegen --version
           pod --version
+
+      - name: Install locked client dependencies
+        working-directory: upstream/client
+        run: npm ci
+
+      - name: Link Apple's C++ runtime directly from the iOS crate
+        run: |
+          set -euo pipefail
+          python3 - <<'PYTHON'
+          from pathlib import Path
+          path = Path("upstream/client/src-tauri/src/lib.rs")
+          content = path.read_text()
+          marker = "mod linux_gpu;"
+          lines = [
+              '// iOS: vendored UnRAR contains native C++ code.',
+              '// Link libc++ directly from the compiled iOS Rust library.',
+              '#[cfg(target_os = "ios")]',
+              '#[link(name = "c++", kind = "dylib")]',
+              'unsafe extern "C" {}',
+              '',
+          ]
+          patch = "\n".join(lines) + "\n"
+          if content.count(marker) != 1:
+              raise SystemExit("Expected marker not found exactly once in lib.rs")
+          if '#[link(name = "c++", kind = "dylib")]' in content:
+              raise SystemExit("iOS libc++ link directive already present")
+          path.write_text(content.replace(marker, patch + marker, 1))
+          print("Inserted native iOS libc++ link directive into src/lib.rs")
+          PYTHON
+          grep -n -A 5 'UnRAR contains native C++ code' upstream/client/src-tauri/src/lib.rs
+
+      - name: Apply iOS-specific app identity and LAN permissions
+        run: |
+          set -euo pipefail
+          cp builder/ios/Info.ios.plist upstream/client/src-tauri/Info.ios.plist
+          cp builder/ios/tauri.ios.conf.json upstream/client/src-tauri/tauri.ios.conf.json
+          /usr/libexec/PlistBuddy -c 'Print NSLocalNetworkUsageDescription' upstream/client/src-tauri/Info.ios.plist
+          python3 -m json.tool upstream/client/src-tauri/tauri.ios.conf.json >/dev/null
+
+      - name: Generate the iOS Xcode project
+        working-directory: upstream/client
+        run: npx tauri ios init --ci
+
+      - name: Build an UNSIGNED device IPA for arm64
+        working-directory: upstream/client
+        run: |
+          set -euo pipefail
+          npx tauri ios build --ci --no-sign
+
+      - name: Validate produced IPA and iOS 16 deployment target
+        run: |
+          set -euo pipefail
+          IPA="$(find upstream/client/src-tauri/gen/apple/build -type f -name '*.ipa' -print -quit)"
+          test -n "$IPA" && test -s "$IPA"
+          echo "IPA found: $IPA"
+          unzip -t "$IPA" | tail -n 2
+          unzip -Z1 "$IPA" | grep -E '^Payload/[^/]+\.app/Info.plist$'
+          mkdir -p /tmp/ipa-inspect
+          ditto -x -k "$IPA" /tmp/ipa-inspect
+          APP="$(find /tmp/ipa-inspect/Payload -maxdepth 1 -type d -name '*.app' -print -quit)"
+          test -n "$APP"
+          /usr/libexec/PlistBuddy -c 'Print :MinimumOSVersion' "$APP/Info.plist"
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Info.plist"
+          EXEC_NAME=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$APP/Info.plist")
+          file "$APP/$EXEC_NAME"
+          lipo -info "$APP/$EXEC_NAME" | grep arm64
+          echo "Unsigned iPhone IPA created: $IPA"
+
+      - name: Upload unsigned iPhone IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: PS5Upload-v7.0.26-iOS16-unsigned-IPA
+          path: upstream/client/src-tauri/gen/apple/build/**/*.ipa
+          if-no-files-found: error
+          retention-days: 14
