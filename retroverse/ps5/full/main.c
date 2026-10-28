@@ -500,7 +500,10 @@ static void diagnostic_storage(int sock) {
     int erased=unlink(filename);
     if(mismatched){diag_fail(sock,"storage","verify temporary file",n<0?saved_errno:EIO);return;}
     if(erased<0){diag_fail(sock,"storage","remove temporary file",errno);return;}
-    json(sock,200,"{\"ok\":true,\"component\":\"storage\",\"location\":\"/data/retroverse/roms/SNES\",\"bytes_verified\":40,\"removed\":true}");
+    char ok[250];snprintf(ok,sizeof ok,
+        "{\"ok\":true,\"component\":\"storage\",\"location\":\"/data/retroverse/roms/SNES\",\"bytes_verified\":%llu,\"removed\":true}",
+        (unsigned long long)sizeof payload);
+    json(sock,200,ok);
 }
 static void diagnostic_network(int sock) {
     const char *url="https://archive.org/download/ultimate-rom-collection/ultimate-rom-collection_meta.xml";
