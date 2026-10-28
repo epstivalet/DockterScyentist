@@ -13,9 +13,11 @@ LDADD := -lSceSsl -lSceHttp
 all: $(ELF)
 assets.inc: index.html embed.py
 	python3 embed.py
-$(ELF): main.c assets.inc
+catalog_data.inc: catalog_build.py
+	python3 catalog_build.py
+$(ELF): main.c assets.inc catalog_data.inc
 	$(CC) $(CFLAGS) -o $@ main.c $(LDADD)
 test: $(ELF)
 	$(PS5_DEPLOY) -h $(PS5_HOST) -p $(PS5_PORT) $(ELF)
 clean:
-	rm -f $(ELF) assets.inc
+	rm -f $(ELF) assets.inc catalog_data.inc
