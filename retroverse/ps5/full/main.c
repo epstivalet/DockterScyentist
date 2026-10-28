@@ -376,7 +376,14 @@ static void curated_matches(int sock,const char *url){
             char raw[1900],decoded[1800],name[800],canonical[1500];
             size_t n=(size_t)(end-cursor);memcpy(raw,cursor,n);raw[n]=0;
             percent_decode(raw,decoded,sizeof decoded);
+            char candidate[1500];
             const char *found=strstr(decoded,prefix);
+            if(!found && decoded[0]!='/' && strncmp(decoded,"http",4)!=0 &&
+               !strchr(decoded,'?') && !strchr(decoded,'#') &&
+               strlen(prefix)+strlen(decoded)+1<sizeof candidate) {
+                snprintf(candidate,sizeof candidate,"%s%s",prefix,decoded);
+                found=candidate;
+            }
             if(found&&strlen(found)<sizeof canonical){
                 snprintf(canonical,sizeof canonical,"%s",found);
                 const char *b=basename_s(canonical);snprintf(name,sizeof name,"%s",b);
