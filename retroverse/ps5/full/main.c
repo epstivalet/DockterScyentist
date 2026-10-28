@@ -23,6 +23,7 @@
 #include <unistd.h>
 #include "assets.inc"
 #include "catalog_data.inc"
+#include "archive_data.inc"
 
 #define PORT 8765
 #define HEADER_MAX 16384
@@ -358,55 +359,52 @@ static void catalog_index(int sock,const char *url){
 
 static int suffix_rom(const char *s){return allowed_ext(s);}
 static void curated_matches(int sock,const char *url){
-    char p[32],title[256];param(url,"platform",p,sizeof p);param(url,"title",title,sizeof title);
-    const char *prefix=curated_prefix(p);
+    char p[32],title[256];
+    param(url,"platform",p,sizeof p);
+    param(url,"title",title,sizeof title);
     if(!platform_ok(p)){error(sock,400,"Unknown platform");return;}
-    if(!prefix){json(sock,200,"{\"supported\":false,\"files\":[]}");return;}
-    char folder[350],encoded[700],remote[1000];snprintf(folder,sizeof folder,"%s",prefix);
-    size_t flen=strlen(folder);
-    if(flen&&folder[flen-1]=='/')folder[flen-1]=0;
-    percent_encode(folder,encoded,sizeof encoded,0);
-    snprintf(remote,sizeof remote,"https://archive.org/download/%s/%s/",ITEM_ID,encoded);
-    size_t size=0;int code=0;unsigned char *html=net_readall(remote,NET_MAX,&size,&code);
-    if(!html){error(sock,502,"Archive directory is unavailable; index may be blocked or too large");return;}
+    const embedded_source_t *index=NULL;
+    for(size_t i=0;i<sizeof embedded_sources/sizeof embedded_sources[0];i++){
+        if(!strcmp(p,embedded_sources[i].platform)){index=&embedded_sources[i];break;}
+    }
+    if(!index || index->length==0 || index->listing[0]==0){
+        json(sock,200,"{\"supported\":false,\"files\":[]}");return;
+    }
     char wanted[260];normalize(title,wanted,sizeof wanted);
-    char *body=malloc(18000);if(!body){free(html);error(sock,500,"Out of memory");return;}
-    size_t used=0;used+=(size_t)snprintf(body+used,18000-used,"{\"supported\":true,\"files\":[");
-    unsigned int matches=0;const char *cursor=(const char*)html;
-    while((cursor=strstr(cursor,"href="))&&matches<24&&used<15000){
-        cursor+=5;char quote=*cursor;if(quote!='"'&&quote!='\'')continue;cursor++;
-        const char *end=strchr(cursor,quote);if(!end)break;
-        if(end-cursor>0&&end-cursor<1900){
-            char raw[1900],decoded[1800],name[800],canonical[1500];
-            size_t n=(size_t)(end-cursor);memcpy(raw,cursor,n);raw[n]=0;
-            percent_decode(raw,decoded,sizeof decoded);
-            char candidate[1500];
-            const char *found=strstr(decoded,prefix);
-            if(!found && decoded[0]!='/' && strncmp(decoded,"http",4)!=0 &&
-               !strchr(decoded,'?') && !strchr(decoded,'#') &&
-               strlen(prefix)+strlen(decoded)+1<sizeof candidate) {
-                snprintf(candidate,sizeof candidate,"%s%s",prefix,decoded);
-                found=candidate;
-            }
-            if(found&&strlen(found)<sizeof canonical){
-                snprintf(canonical,sizeof canonical,"%s",found);
-                const char *b=basename_s(canonical);snprintf(name,sizeof name,"%s",b);
-                char norm[260];normalize(name,norm,sizeof norm);
-                if(norm[0]&&wanted[0]&&!strcmp(norm,wanted)&&suffix_rom(name)&&safe_archive_path(p,canonical)){
-                    char quoted_name[1900],quoted_path[3300];
+    char *body=malloc(20000);
+    if(!body){error(sock,500,"Out of memory");return;}
+    size_t used=(size_t)snprintf(body,20000,"{\"supported\":true,\"files\":[");
+    unsigned int matches=0;
+    const char *cursor=index->listing;
+    while(*cursor&&matches<24&&used<16000){
+        const char *end=strchr(cursor,'\n');
+        if(!end)end=cursor+strlen(cursor);
+        size_t len=(size_t)(end-cursor);
+        if(len>0&&len<240){
+            char name[260],canonical[600],norm[260];
+            memcpy(name,cursor,len);name[len]=0;
+            normalize(name,norm,sizeof norm);
+            if(wanted[0]&&norm[0]&&!strcmp(norm,wanted)){
+                int n=snprintf(canonical,sizeof canonical,"%s%s",index->prefix,name);
+                if(n>0&&(size_t)n<sizeof canonical&&safe_archive_path(p,canonical)){
+                    char quoted_name[650],quoted_path[1400];
                     json_quote(name,quoted_name,sizeof quoted_name);
                     json_quote(canonical,quoted_path,sizeof quoted_path);
-                    used+=(size_t)snprintf(body+used,18000-used,"%s{\"filename\":%s,\"display_name\":%s,\"size\":0,\"source_kind\":\"%s\"}",
-                      matches?",":"",quoted_path,quoted_name,strstr(prefix,".zip/")?"zip-entry":"direct-file");
-                    matches++;
+                    int written=snprintf(body+used,20000-used,
+                      "%s{\"filename\":%s,\"display_name\":%s,\"size\":0,\"source_kind\":\"%s\"}",
+                      matches?",":"",quoted_path,quoted_name,
+                      strstr(index->prefix,".zip/")?"zip-entry":"direct-file");
+                    if(written>0&&(size_t)written<20000-used){
+                       used+=(size_t)written;matches++;
+                    }
                 }
             }
         }
-        cursor=end+1;
+        cursor=(*end=='\n')?end+1:end;
     }
-    used+=(size_t)snprintf(body+used,18000-used,"]}");
+    used+=(size_t)snprintf(body+used,20000-used,"]}");
     response(sock,200,"OK","application/json; charset=utf-8",body,used);
-    free(body);free(html);
+    free(body);
 }
 static int parse_header(const char *s,const char *key,unsigned long long *val){
     size_t len=strlen(key);const char *p=s;
