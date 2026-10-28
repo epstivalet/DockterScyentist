@@ -9,7 +9,7 @@ CFLAGS += $(shell $(PS5_PAYLOAD_SDK)/bin/prospero-pkg-config libcurl --cflags)
 CURL_LIBS := $(shell $(PS5_PAYLOAD_SDK)/bin/prospero-pkg-config --static --libs libcurl)
 SDL_LIBS := $(HB)/lib/libSDL2main.a $(HB)/lib/libSDL2.a $(HB)/lib/libSDL2_image.a \
             $(HB)/lib/libpng.a $(HB)/lib/libjpeg.a $(HB)/lib/libwebp.a \
-            $(HB)/lib/libsharpyuv.a
+            $(HB)/lib/libwebpdemux.a $(HB)/lib/libsharpyuv.a
 PS5_LIBS := -lSceSsl -lSceHttp -lScePad -lSceVideoOut -lSceAudioOut \
             -lSceSystemService -lSceUserService -lSceKeyboard -lSceImeDialog -lkernel_sys
 LIBS := $(SDL_LIBS) $(CURL_LIBS) $(PS5_LIBS) -lm -lz -lbz2 -liconv
