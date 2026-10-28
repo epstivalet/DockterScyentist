@@ -54,6 +54,7 @@ int sceHttpCreateConnectionWithURL(int,const char*,int);
 int sceHttpDeleteConnection(int);
 int sceHttpCreateRequestWithURL(int,int,const char*,uint64_t);
 int sceHttpSendRequest(int,const void*,size_t);
+int sceHttpSetAutoRedirect(int,int);
 int sceHttpGetStatusCode(int,int*);
 int sceHttpGetResponseContentLength(int,int*,uint64_t*);
 int sceHttpReadData(int,void*,size_t);
@@ -78,6 +79,8 @@ static int net_open(Net *n, const char *url) {
     if(sceHttpSetResponseHeaderMaxSize(n->tmpl,32768)<0)return -6;
     if((n->conn=sceHttpCreateConnectionWithURL(n->tmpl,url,0))<0)return -7;
     if((n->req=sceHttpCreateRequestWithURL(n->conn,0,url,0))<0)return -8;
+    /* Archive.org often redirects downloads to a regional storage host. */
+    (void)sceHttpSetAutoRedirect(n->req,1);
     return 0;
 }
 static int net_begin(Net *n,const char *url) {
