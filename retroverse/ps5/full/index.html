@@ -67,7 +67,7 @@ nav button{flex:0 0 auto;white-space:nowrap;font-size:12px;padding:10px 12px}
 }
 </style></head><body>
 <header><span class="brand">RETRO<b>VERSE</b> <small style="font-size:11px;letter-spacing:.1em">PS5</small></span>
-<nav><button class="tab active" data-tab="store">STORE</button><button class="tab" data-tab="library">MY LIBRARY</button><button class="tab" data-tab="downloads">DOWNLOADS</button></nav>
+<nav><button class="tab active" data-tab="store">STORE</button><button class="tab" data-tab="hosts">HOSTS</button><button class="tab" data-tab="library">MY LIBRARY</button><button class="tab" data-tab="downloads">DOWNLOADS</button></nav>
 <span class="status" id="connection">CONNECTING…</span></header>
 <main class="wrap">
 <section id="store">
@@ -79,10 +79,24 @@ nav button{flex:0 0 auto;white-space:nowrap;font-size:12px;padding:10px 12px}
 <div class="row"><h2 id="browseTitle">SNES GAMES · A</h2><input type="search" id="filter" placeholder="Filter games starting with A…" aria-label="Filter current letter"></div>
 <div class="letters" id="letters"></div><p class="subtle" id="catalogState">Loading catalog…</p><div class="cards" id="cards"></div>
 </section>
+
+<section id="hosts" class="hidden">
+ <div class="row"><h2>AVAILABLE BY HOST</h2><span class="pill">Listed files only · delivery not yet verified</span></div>
+ <p class="subtle">This tab shows games with individual filenames in an indexed source. The artwork catalog alone does not make a game downloadable. Vimm's Lair is listed as external browsing only until a supported file index is available.</p>
+ <div class="actions">
+ <select id="hostSelector" aria-label="Select game source"><option value="archive">Internet Archive · Curated Collection</option><option value="vimm">Vimm's Lair · External only</option></select>
+ <select id="hostPlatform" aria-label="Select console"></select>
+ <button class="secondary" id="hostRefresh">REFRESH FILE LIST</button>
+ </div>
+ <div class="letters" id="hostLetters"></div>
+ <div class="row"><h2 id="hostHeading">Indexed files</h2><input type="search" id="hostFilter" placeholder="Filter indexed filenames…"></div>
+ <p class="subtle" id="hostInfo">Choose a source and console.</p>
+ <div class="cards" id="hostCards"></div>
+</section>
 <section id="library" class="hidden"><h2>MY PS5 LIBRARY</h2><p class="subtle">Files imported or downloaded to /data/retroverse/roms/ on your PS5. No system files are modified.</p>
 <div class="actions"><button class="primary" id="refreshLibrary">REFRESH</button><select id="uploadPlatform"></select><input type="file" id="uploadFile" aria-label="Choose authorized game file"><button class="secondary" id="uploadButton">UPLOAD FROM PC / PHONE</button></div>
 <p class="subtle" id="uploadState"></p><div class="pane" id="libraryList">Loading…</div></section>
-<section id="downloads" class="hidden"><h2>DOWNLOAD MANAGER</h2><p class="subtle">Downloads are written directly by the PS5 payload to its RetroVerse library. Only download content you are authorized to use.</p><button class="secondary" id="refreshJobs">REFRESH STATUS</button><div class="pane" id="jobs">No downloads yet.</div></section>
+<section id="downloads" class="hidden"><h2>DOWNLOAD MANAGER</h2><p class="subtle">Downloads are written directly by the PS5 payload to its RetroVerse library. Only download content you are authorized to use.</p><div class="actions"><button class="primary" id="testDownload">TEST PS5 DOWNLOAD + STORAGE</button><button class="secondary" id="refreshJobs">REFRESH STATUS</button></div><p class="subtle" id="testResult">This test fetches a small public XML metadata file from Internet Archive, writes it to RetroVerse storage, verifies it, and deletes it. No ROM is downloaded.</p><div class="pane" id="jobs">No downloads yet.</div></section>
 </main>
 <dialog id="detailDialog" class="modal"><button class="secondary" id="closeDetail" style="float:right">✕ CLOSE</button>
 <div class="detail"><div><img id="detailArt" alt="Game cover"><img id="detailShot" alt="Game screenshot" style="margin-top:14px"></div>
@@ -204,9 +218,9 @@ async function findSources(){
  }catch(e){el('sourceStatus').textContent='Source lookup unavailable: '+e.message}
 }
 function tab(name){
- ['store','library','downloads'].forEach(function(n){el(n).classList.toggle('hidden',n!==name)});
+ ['store','hosts','library','downloads'].forEach(function(n){el(n).classList.toggle('hidden',n!==name)});
  document.querySelectorAll('nav .tab').forEach(function(b){b.classList.toggle('active',b.dataset.tab===name)});
- if(name==='library')loadLibrary();if(name==='downloads')loadJobs();
+ if(name==='library')loadLibrary();if(name==='downloads')loadJobs();if(name==='hosts')loadHostGames();
 }
 async function loadLibrary(){
  try{var x=await get('/api/library');var box=el('libraryList');box.replaceChildren();
@@ -222,6 +236,84 @@ async function uploadGame(){
   el('uploadState').textContent='Saved to '+x.saved_to;loadLibrary()
  }catch(e){el('uploadState').textContent='Upload failed: '+e.message}
 }
+
+var hostLetter='A',hostEntries=[],hostLoadToken=0;
+function renderHostLetters(){
+ var box=el('hostLetters');box.replaceChildren();
+ '#ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').forEach(function(ch){
+  var b=document.createElement('button');b.textContent=ch;b.className=ch===hostLetter?'active':'';
+  b.onclick=function(){hostLetter=ch;renderHostLetters();loadHostGames()};
+  box.appendChild(b);
+ });
+}
+function hostGameTitle(f){return String(f.title||'').trim()}
+async function loadHostGames(){
+ var source=el('hostSelector').value,p=el('hostPlatform').value,token=++hostLoadToken;
+ el('hostCards').replaceChildren();
+ el('hostHeading').textContent=source==='archive'?'Internet Archive · '+p+' · '+hostLetter:'Vimm’s Lair';
+ if(source!=='archive'){
+  hostEntries=[];el('hostInfo').textContent='Vimm’s Lair has not provided a verified public direct-file index. Its game pages can be browsed externally, but no downloads are claimed.';
+  var a=document.createElement('a');a.href='https://vimm.net/vault';a.target='_blank';a.rel='noopener noreferrer';a.textContent='Open Vimm’s Vault';
+  el('hostCards').appendChild(a);return;
+ }
+ el('hostInfo').textContent='Loading indexed filenames for '+p+'…';
+ try{
+  var data=await get('/api/host-games?host=archive&platform='+enc(p)+'&letter='+enc(hostLetter));
+  if(token!==hostLoadToken)return;
+  hostEntries=data.games||[];
+  el('hostInfo').textContent=data.indexed?
+    hostEntries.length+' filenames found for '+p+' under '+hostLetter+'. Files are listed, but remote delivery must still be tested.':
+    'No indexed files for this console in the configured collection.';
+  renderHostCards();
+ }catch(e){if(token===hostLoadToken)el('hostInfo').textContent='Host index error: '+e.message}
+}
+function renderHostCards(){
+ var root=el('hostCards');root.replaceChildren();
+ var q=el('hostFilter').value.trim().toLowerCase();
+ var p=el('hostPlatform').value;
+ var matched=hostEntries.filter(function(e){return hostGameTitle(e).toLowerCase().includes(q)});
+ matched.slice(0,350).forEach(function(e){
+  var g={title:e.title,filename:e.title,system:(SYSTEMS.find(function(s){return s[0]===p})||SYSTEMS[0])[2],platform:p};
+  var b=document.createElement('button');b.className='game';
+  var img=document.createElement('img');img.loading='lazy';img.alt='Artwork for '+e.title;img.src=getArt(g,'Named_Boxarts');
+  img.onerror=function(){img.onerror=null;img.style.visibility='hidden'};
+  var label=document.createElement('strong');label.textContent=e.title;
+  var small=document.createElement('small');small.textContent='FILE LISTED · OPEN';
+  b.append(img,label,small);b.onclick=function(){showDetails(g);appendHostFile(e)};
+  root.appendChild(b);
+ });
+}
+function appendHostFile(e){
+ var root=el('sourceMatches');root.replaceChildren();
+ var line=document.createElement('div');line.className='source';
+ var info=document.createElement('span');info.textContent='Internet Archive listed: '+e.filename;
+ var b=document.createElement('button');b.textContent='TRY PS5 DOWNLOAD';
+ b.onclick=async function(){
+  if(!confirm('Try downloading '+e.title+' directly onto the PS5? Only proceed if you have permission to use this file.'))return;
+  b.disabled=true;
+  try{
+   await get('/api/curated/download',{method:'POST',headers:{'Content-Type':'application/json'},
+     body:JSON.stringify({platform:e.platform,filename:e.filename,title:e.title,rights_confirmed:true})});
+   el('detailDialog').close();tab('downloads');loadJobs();
+  }catch(err){alert('Download could not start: '+err.message);b.disabled=false}
+ };
+ line.append(info,b);root.appendChild(line);
+ el('sourceStatus').textContent='The file is in the indexed Archive listing. Download availability is not guaranteed. Run the download test first.';
+}
+async function checkDownloadPipeline(){
+ var b=el('testDownload');b.disabled=true;
+ el('testResult').textContent='Testing PS5 HTTPS, transfer, file creation and readback…';
+ try{
+  var x=await get('/api/test-download',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
+  el('testResult').textContent='PASS: PS5 downloaded '+x.bytes_written+' bytes from '+x.host+
+   ', verified the saved file and removed the test copy. Direct downloads can now be tested with an authorized file.';
+ }catch(e){
+  el('testResult').textContent='FAILED: '+e.message+
+   '. The catalog and covers may still work. Try a browser download followed by MY LIBRARY → UPLOAD FROM PC / PHONE.';
+ }
+ b.disabled=false;
+}
+
 async function loadJobs(){
  try{var res=await get('/api/jobs');var root=el('jobs');root.replaceChildren();
   if(!res.jobs.length){root.textContent='No active transfers.';return}
@@ -242,6 +334,14 @@ el('findDownload').onclick=findSources;
 el('importThis').onclick=function(){el('detailDialog').close();tab('library');el('uploadPlatform').value=platform;el('uploadFile').click()};
 el('openVimm').onclick=function(){window.open('https://vimm.net/vault','_blank','noopener,noreferrer')};
 el('uploadButton').onclick=uploadGame;el('refreshLibrary').onclick=loadLibrary;el('refreshJobs').onclick=loadJobs;
+el('hostSelector').onchange=loadHostGames;
+el('hostPlatform').onchange=function(){hostLetter='A';renderHostLetters();loadHostGames()};
+el('hostRefresh').onclick=loadHostGames;
+el('hostFilter').oninput=renderHostCards;
+el('testDownload').onclick=checkDownloadPipeline;
+el('hostPlatform').innerHTML=SYSTEMS.map(function(s){return '<option value="'+s[0]+'">'+s[1]+'</option>'}).join('');
+renderHostLetters();
+
 document.addEventListener('keydown',function(e){if(el('detailDialog').open||!el('store').classList.contains('hidden')===false)return;
  if(e.key==='ArrowDown'){step(1);e.preventDefault()}else if(e.key==='ArrowUp'){step(-1);e.preventDefault()}
  else if(e.key==='ArrowRight'){var ix='ABCDEFGHIJKLMNOPQRSTUVWXYZ'.indexOf(letter);letter='ABCDEFGHIJKLMNOPQRSTUVWXYZ'[(ix+1)%26];renderLetters();draw();e.preventDefault()}
