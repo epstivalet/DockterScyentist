@@ -1,0 +1,50 @@
+name: Build RetroVerse PS5 Native TV ELF
+on:
+  workflow_dispatch:
+  push:
+    branches: [retroverse-ps5-alpha]
+    paths:
+      - 'retroverse/ps5/native/**'
+      - 'retroverse/ps5/full/**'
+      - '.github/workflows/build-retroverse-ps5-native.yml'
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install toolchain requirements
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y clang-18 lld-18 make python3 unzip wget curl ca-certificates
+      - name: Install PS5 Payload SDK
+        run: |
+          wget -q -O /tmp/sdk.zip https://github.com/ps5-payload-dev/sdk/releases/latest/download/ps5-payload-sdk.zip
+          sudo unzip -q /tmp/sdk.zip -d /opt
+          test -f /opt/ps5-payload-sdk/toolchain/prospero.mk
+      - name: Install pinned PacBrew PS5 SDL2 and libcurl
+        run: |
+          curl -fL --retry 3 -o /tmp/pacbrew.tar.gz \
+            https://github.com/ps5-payload-dev/pacbrew-repo/releases/download/v0.40.2/ps5-payload-dev.tar.gz
+          echo "a85f65de418a8e6a898c6c3e3c870d50fff7618a200e4dd59ea9692af6ecec4d  /tmp/pacbrew.tar.gz" | sha256sum -c -
+          sudo tar -xzf /tmp/pacbrew.tar.gz -C / opt/ps5-payload-sdk/target/user
+          test -f /opt/ps5-payload-sdk/target/user/homebrew/lib/libSDL2.a
+          test -f /opt/ps5-payload-sdk/target/user/homebrew/lib/libSDL2_image.a
+          test -f /opt/ps5-payload-sdk/target/user/homebrew/lib/libSDL2main.a
+          /opt/ps5-payload-sdk/bin/prospero-pkg-config --static --libs libcurl
+      - name: Check C frontend rendering source
+        run: |
+          grep -q 'SDL_CONTROLLERBUTTONDOWN' retroverse/ps5/native/main.c
+          grep -q 'SDL_CreateRenderer' retroverse/ps5/native/main.c
+      - name: Build SDL2 native PS5 ELF
+        env:
+          PS5_PAYLOAD_SDK: /opt/ps5-payload-sdk
+        run: |
+          make -C retroverse/ps5/native
+          file retroverse/ps5/native/retroverse-ps5-tv-native.elf
+          ls -lh retroverse/ps5/native/retroverse-ps5-tv-native.elf
+      - name: Upload native TV ELF
+        uses: actions/upload-artifact@v4
+        with:
+          name: RetroVerse-PS5-Native-TV-ELF
+          path: retroverse/ps5/native/retroverse-ps5-tv-native.elf
+          if-no-files-found: error
