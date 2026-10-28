@@ -15,9 +15,11 @@ assets.inc: index.html embed.py
 	python3 embed.py
 catalog_data.inc: catalog_build.py
 	python3 catalog_build.py
-$(ELF): main.c assets.inc catalog_data.inc
+archive_data.inc: archive_catalog_build.py
+	python3 archive_catalog_build.py
+$(ELF): main.c assets.inc catalog_data.inc archive_data.inc
 	$(CC) $(CFLAGS) -o $@ main.c $(LDADD)
 test: $(ELF)
 	$(PS5_DEPLOY) -h $(PS5_HOST) -p $(PS5_PORT) $(ELF)
 clean:
-	rm -f $(ELF) assets.inc catalog_data.inc
+	rm -f $(ELF) assets.inc catalog_data.inc archive_data.inc
