@@ -10,7 +10,7 @@ ELF := retroverse-ps5-store.elf
 CFLAGS := -Wall -Wextra -O2
 CFLAGS += $(shell $(PS5_PAYLOAD_SDK)/bin/prospero-pkg-config libcurl --cflags)
 LDADD := -lSceSsl -lSceHttp
-LDADD += $(shell $(PS5_PAYLOAD_SDK)/bin/prospero-pkg-config libcurl --libs)
+LDADD += $(shell $(PS5_PAYLOAD_SDK)/bin/prospero-pkg-config --static --libs libcurl)
 .PHONY: all clean test
 all: $(ELF)
 assets.inc: index.html embed.py
