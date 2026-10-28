@@ -41,7 +41,30 @@ input,select{padding:12px 13px;background:#171c30;color:white;border:1px solid #
 .pill{display:inline-block;padding:5px 9px;background:#324568;border-radius:30px;font-size:12px}
 .progress{height:8px;background:#293149;border-radius:100px;overflow:hidden;margin-top:6px}.progress div{height:100%;background:var(--accent)}
 footer{color:#98a9c9;text-align:center;font-size:12px;padding:40px 12px}
-@media(max-width:850px){.stage-content{grid-template-columns:1fr}.tvbox{min-height:280px;padding:0}.tvscreen{margin:8% auto;width:45%}.stage-content{min-height:0}.info{padding:20px}.stage{min-height:0}.detail{grid-template-columns:1fr}.feature-title{font-size:35px}}
+@media(max-width:850px){
+html,body{max-width:100%;overflow-x:hidden}
+header{position:relative;display:flex;flex-wrap:wrap;padding:12px 16px;gap:8px;justify-content:space-between}
+header .brand{font-size:clamp(21px,5.4vw,27px);white-space:nowrap}
+header .status{font-size:10px;margin-left:auto;white-space:nowrap}
+nav{order:3;flex:0 0 100%;width:100%;min-width:0;overflow-x:auto;gap:7px;padding-bottom:3px}
+nav button{flex:0 0 auto;white-space:nowrap;font-size:12px;padding:10px 12px}
+.wrap{padding:14px 12px 65px}
+.stage{min-height:0;border-radius:14px}
+.stage-content{grid-template-columns:minmax(0,1fr);min-height:0}
+.tvbox{min-height:245px;padding:14px}
+.tvscreen{margin:7% auto;width:48%;max-width:260px;border-width:7px}
+.info{padding:20px 16px 24px}
+.feature-title{font-size:clamp(24px,7vw,36px)}
+.wheel{max-height:215px}
+.actions button{padding:11px 12px;font-size:12px}
+.detail{grid-template-columns:1fr}
+.cards{grid-template-columns:repeat(2,minmax(0,1fr))}
+.game img{height:155px}
+.letters button{min-width:32px;padding:7px}
+.row{align-items:stretch}
+.row input{width:100%;min-width:0}
+.modal{padding:17px;width:96vw}
+}
 </style></head><body>
 <header><span class="brand">RETRO<b>VERSE</b> <small style="font-size:11px;letter-spacing:.1em">PS5</small></span>
 <nav><button class="tab active" data-tab="store">STORE</button><button class="tab" data-tab="library">MY LIBRARY</button><button class="tab" data-tab="downloads">DOWNLOADS</button></nav>
