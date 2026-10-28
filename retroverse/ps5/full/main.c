@@ -24,6 +24,7 @@
 #include "assets.inc"
 #include "catalog_data.inc"
 #include "archive_data.inc"
+#include "curl_net.h"
 
 #define PORT 8765
 #define HEADER_MAX 16384
@@ -272,35 +273,44 @@ enum {J_IDLE=0,J_DOWNLOADING=1,J_COMPLETED=2,J_FAILED=3,J_CANCELED=4};
 static void *download_thread(void *arg){
     (void)arg;
     char dest[650],part[650],url[2300];
-    Net net;FILE *f=NULL;int code;
     char base[256];snprintf(base,sizeof base,"%s",basename_s(job.path));
-    if(directories(job.platform)<0){snprintf(job.error,sizeof job.error,"Unable to create /data/retroverse folders (%s)",strerror(errno));job.state=J_FAILED;return NULL;}
+    if(directories(job.platform)<0){
+        snprintf(job.error,sizeof job.error,"Unable to create PS5 library: %s",strerror(errno));
+        job.state=J_FAILED;return NULL;
+    }
     snprintf(dest,sizeof dest,"%s/%s/%s",ROM_DIR,job.platform,base);
-    if(access(dest,F_OK)==0){snprintf(job.error,sizeof job.error,"File already exists; no overwrite permitted");job.state=J_FAILED;return NULL;}
+    if(access(dest,F_OK)==0){
+        snprintf(job.error,sizeof job.error,"File already exists, no overwrite allowed");
+        job.state=J_FAILED;return NULL;
+    }
     snprintf(part,sizeof part,"%s/%s/.retroverse-%u.part",ROM_DIR,job.platform,job.id);
     save_url(job.platform,job.path,url,sizeof url);
-    code=net_begin(&net,url);
-    if(code!=200){snprintf(job.error,sizeof job.error,"Archive download HTTP/status %d",code);net_close(&net);job.state=J_FAILED;return NULL;}
-    int len_type=0;uint64_t size=0;
-    if(sceHttpGetResponseContentLength(net.req,&len_type,&size)>=0&&size>0&&size<=DOWNLOAD_MAX)job.total=size;
-    if(size>DOWNLOAD_MAX){snprintf(job.error,sizeof job.error,"File too large");net_close(&net);job.state=J_FAILED;return NULL;}
-    f=fopen(part,"wb");
-    if(!f){snprintf(job.error,sizeof job.error,"Cannot open PS5 output file (%s)",strerror(errno));net_close(&net);job.state=J_FAILED;return NULL;}
-    unsigned char chunk[65536];int failure=0;
-    while(!job.cancel) {
-        int n=sceHttpReadData(net.req,chunk,sizeof chunk);
-        if(n<0){snprintf(job.error,sizeof job.error,"Network read error %d",n);failure=1;break;}
-        if(!n)break;
-        if(job.received+(uint64_t)n>DOWNLOAD_MAX){snprintf(job.error,sizeof job.error,"10 GB download limit reached");failure=1;break;}
-        if(fwrite(chunk,1,(size_t)n,f)!=(size_t)n){snprintf(job.error,sizeof job.error,"PS5 write failed (%s)",strerror(errno));failure=1;break;}
-        job.received+=(uint64_t)n;
+    FILE *f=fopen(part,"wb");
+    if(!f){
+        snprintf(job.error,sizeof job.error,"Cannot create output file: %s",strerror(errno));
+        job.state=J_FAILED;return NULL;
     }
-    if(fclose(f)!=0){failure=1;snprintf(job.error,sizeof job.error,"Failed closing output file");}
-    net_close(&net);
+    int err=rv_https_download(url,f,DOWNLOAD_MAX,&job.cancel,&job.received,&job.total,
+                              job.error,sizeof job.error);
+    if(fclose(f)!=0 && !err){
+        snprintf(job.error,sizeof job.error,"Failed to flush file: %s",strerror(errno));
+        err=-1;
+    }
     if(job.cancel){unlink(part);job.state=J_CANCELED;return NULL;}
-    if(!failure&&job.total&&job.received!=job.total){failure=1;snprintf(job.error,sizeof job.error,"Incomplete download");}
-    if(!failure&&rename(part,dest)<0){failure=1;snprintf(job.error,sizeof job.error,"Could not finalize download");}
-    if(failure){unlink(part);job.state=J_FAILED;return NULL;}
+    if(!err&&job.total && job.received!=job.total){
+        snprintf(job.error,sizeof job.error,"Incomplete file: received %llu of %llu bytes",
+            (unsigned long long)job.received,(unsigned long long)job.total);
+        err=-1;
+    }
+    if(!err && !job.received){
+        snprintf(job.error,sizeof job.error,"Source returned an empty file");
+        err=-1;
+    }
+    if(!err && rename(part,dest)<0){
+        snprintf(job.error,sizeof job.error,"Cannot finalize download: %s",strerror(errno));
+        err=-1;
+    }
+    if(err){unlink(part);job.state=J_FAILED;return NULL;}
     snprintf(job.saved,sizeof job.saved,"roms/%s/%s",job.platform,base);
     job.state=J_COMPLETED;return NULL;
 }
@@ -560,20 +570,40 @@ static void diagnostic_network(int sock) {
     json(sock,200,out);
 }
 
+static void diagnostic_curl(int sock){
+    const char *url="https://archive.org/download/ultimate-rom-collection/ultimate-rom-collection_meta.xml";
+    unsigned char *data=NULL;size_t len=0;
+    char message[400]={0};
+    int rc=rv_https_get_memory(url,2u*1024u*1024u,&data,&len,message,sizeof message);
+    if(rc<0){
+        char quoted[850],body[1050];
+        json_quote(message,quoted,sizeof quoted);
+        snprintf(body,sizeof body,"{\"ok\":false,\"component\":\"curl\",\"step\":\"https GET\",\"detail\":%s}",quoted);
+        json(sock,200,body);return;
+    }
+    int valid=len>128 && data[0]=='<' && strstr((char*)data,"metadata");
+    free(data);
+    if(!valid){json(sock,200,"{\"ok\":false,\"component\":\"curl\",\"step\":\"content verification\"}");return;}
+    char body[250];snprintf(body,sizeof body,
+     "{\"ok\":true,\"component\":\"curl\",\"bytes_received\":%llu,\"verified\":true}",
+     (unsigned long long)len);
+    json(sock,200,body);
+}
 static void test_download(int sock){
     const char *url="https://archive.org/download/ultimate-rom-collection/ultimate-rom-collection_meta.xml";
-    size_t length=0;int status=0;
-    unsigned char *data=net_readall(url,2u*1024u*1024u,&length,&status);
-    if(!data) {
-        char msg[180];
-        snprintf(msg,sizeof msg,"PS5 HTTPS failed (status %d); catalog remains available offline",status);
-        error(sock,502,msg);
-        return;
+    size_t length=0;
+    unsigned char *data=NULL;
+    char err[400]={0};
+    if(rv_https_get_memory(url,2u*1024u*1024u,&data,&length,err,sizeof err)<0){
+        char quoted[900],body[1000];
+        json_quote(err,quoted,sizeof quoted);
+        snprintf(body,sizeof body,"{\"error\":%s,\"step\":\"curl-download\"}",quoted);
+        json(sock,502,body);return;
     }
-    if(length<128 || data[0]!='<' || !strstr((const char*)data,"metadata")){
-        free(data);error(sock,502,"Host returned unexpected data, not an XML metadata file");return;
+    if(length<128||data[0]!='<'||!strstr((const char*)data,"metadata")){
+        free(data);error(sock,502,"Downloaded metadata content was unexpected");return;
     }
-    if(mkdir(BASE_DIR,0700)<0 && errno!=EEXIST){
+    if(mkdir(BASE_DIR,0700)<0&&errno!=EEXIST){
         free(data);error(sock,500,"Cannot create RetroVerse data folder");return;
     }
     char path[512];snprintf(path,sizeof path,"%s/.archive-download-test.xml",BASE_DIR);
@@ -581,15 +611,19 @@ static void test_download(int sock){
     if(!out){free(data);error(sock,500,"Cannot write test file to PS5 application data");return;}
     int bad=fwrite(data,1,length,out)!=length;
     if(fclose(out)!=0)bad=1;
-    unsigned char sample[64]={0};
     FILE *in=fopen(path,"rb");
     if(!in)bad=1;
-    else {size_t n=fread(sample,1,sizeof sample,in);if(n!=sizeof sample || memcmp(sample,data,sizeof sample)!=0)bad=1;fclose(in);}
+    else {
+        unsigned char sample[64];
+        size_t n=fread(sample,1,sizeof sample,in);
+        if(n!=sizeof sample||memcmp(sample,data,sizeof sample)!=0)bad=1;
+        fclose(in);
+    }
     unlink(path);free(data);
     if(bad){error(sock,500,"PS5 storage could not verify a downloaded file");return;}
-    char body[230];snprintf(body,sizeof body,
-       "{\"ok\":true,\"host\":\"archive\",\"http_status\":%d,\"bytes_written\":%llu,\"verified\":true,\"test_file_removed\":true}",
-       status,(unsigned long long)length);
+    char body[260];snprintf(body,sizeof body,
+      "{\"ok\":true,\"host\":\"archive\",\"transport\":\"libcurl\",\"http_status\":200,\"bytes_written\":%llu,\"verified\":true,\"test_file_removed\":true}",
+      (unsigned long long)length);
     json(sock,200,body);
 }
 
@@ -643,7 +677,7 @@ static void serve(int sock) {
     if(path_len>=sizeof path){error(sock,414,"URL too long");return;}memcpy(path,url,path_len);path[path_len]=0;
     if(!strcmp(method,"GET")){
         if(!strcmp(path,"/")||!strcmp(path,"/index.html")){response(sock,200,"OK","text/html; charset=utf-8",ui_page,UI_PAGE_LEN);return;}
-        if(!strcmp(path,"/api/health")){json(sock,200,"{\"ok\":true,\"mode\":\"ps5\",\"version\":\"0.5\",\"features\":[\"catalog\",\"art\",\"curated_source\",\"downloads\",\"upload\",\"library\"]}");return;}
+        if(!strcmp(path,"/api/health")){json(sock,200,"{\"ok\":true,\"mode\":\"ps5\",\"version\":\"0.6\",\"features\":[\"catalog\",\"art\",\"curated_source\",\"downloads\",\"upload\",\"library\"]}");return;}
         if(!strcmp(path,"/api/catalog-index")){catalog_index(sock,url);return;}
         if(!strcmp(path,"/api/host-games")){host_games(sock,url);return;}
         if(!strcmp(path,"/api/curated/matches")){curated_matches(sock,url);return;}
@@ -664,6 +698,7 @@ static void serve(int sock) {
         if(!strcmp(path,"/api/test-download")){test_download(sock);return;}
         if(!strcmp(path,"/api/diagnostics/storage")){diagnostic_storage(sock);return;}
         if(!strcmp(path,"/api/diagnostics/network")){diagnostic_network(sock);return;}
+        if(!strcmp(path,"/api/diagnostics/curl")){diagnostic_curl(sock);return;}
         if(!strcmp(path,"/api/archive/cancel")){job.cancel=1;json(sock,200,"{\"ok\":true}");return;}
         error(sock,404,"Unsupported endpoint");return;
     }
