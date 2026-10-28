@@ -193,7 +193,9 @@ function drawWheel(){
 }
 function step(n){if(!shown.length)return;selected=(selected+n+shown.length)%shown.length;drawWheel()}
 function showDetails(g){
- current=g;el('detailTitle').textContent=g.title;el('detailPlatform').textContent=sys()[1]+' · '+(g.region||'REGION UNSPECIFIED');
+ current=g;el('detailTitle').textContent=g.title;
+ var selectedSystem=SYSTEMS.find(function(x){return x[0]===g.platform})||sys();
+ el('detailPlatform').textContent=selectedSystem[1]+' · '+(g.region||'REGION UNSPECIFIED');
  el('detailArt').src=getArt(g,'Named_Boxarts');el('detailShot').src=getArt(g,'Named_Snaps');
  el('sourceStatus').textContent='Choose a source. Direct Archive availability is checked on demand.';
  el('sourceMatches').replaceChildren();el('detailDialog').showModal();
