@@ -406,6 +406,95 @@ static void curated_matches(int sock,const char *url){
     response(sock,200,"OK","application/json; charset=utf-8",body,used);
     free(body);
 }
+
+/* Enumerate only titles actually named in a locally indexed source collection.
+ * A listing does NOT guarantee that the host will deliver the file. */
+static void host_games(int sock,const char *url){
+    char platform[32],letter[8],host[32];
+    param(url,"platform",platform,sizeof platform);
+    param(url,"letter",letter,sizeof letter);
+    param(url,"host",host,sizeof host);
+    if(strcmp(host,"archive")){error(sock,400,"This host has no verified file index");return;}
+    if(!platform_ok(platform)){error(sock,400,"Unknown platform");return;}
+    const embedded_source_t *index=NULL;
+    for(size_t i=0;i<sizeof embedded_sources/sizeof embedded_sources[0];i++)
+      if(!strcmp(platform,embedded_sources[i].platform)){index=&embedded_sources[i];break;}
+    if(!index || !index->length || !index->listing[0]){
+        json(sock,200,"{\"host\":\"archive\",\"indexed\":false,\"games\":[]}");return;
+    }
+    char *body=malloc(160000);
+    if(!body){error(sock,500,"Out of memory");return;}
+    size_t used=(size_t)snprintf(body,160000,"{\"host\":\"archive\",\"indexed\":true,\"games\":[");
+    unsigned int count=0;
+    const char *cursor=index->listing;
+    while(*cursor && count<350 && used<154000) {
+        const char *end=strchr(cursor,'\n');if(!end)end=cursor+strlen(cursor);
+        size_t len=(size_t)(end-cursor);
+        if(len>0 && len<240){
+            char filename[260],canonical[600],title[300],norm[300];
+            memcpy(filename,cursor,len);filename[len]=0;
+            snprintf(title,sizeof title,"%s",filename);
+            char *dot=strrchr(title,'.');if(dot&&allowed_ext(dot))*dot=0;
+            char *group=strstr(title," (");if(group)*group=0;
+            normalize(filename,norm,sizeof norm);
+            unsigned char first=(unsigned char)title[0];
+            char initial=(char)(isalpha(first)?toupper(first):'#');
+            if((!letter[0] || letter[0]==initial) && allowed_ext(filename)){
+                int n=snprintf(canonical,sizeof canonical,"%s%s",index->prefix,filename);
+                if(n>0&&(size_t)n<sizeof canonical&&safe_archive_path(platform,canonical)) {
+                    char qtitle[800],qfile[1400];
+                    json_quote(title,qtitle,sizeof qtitle);
+                    json_quote(canonical,qfile,sizeof qfile);
+                    int written=snprintf(body+used,160000-used,
+                       "%s{\"title\":%s,\"filename\":%s,\"platform\":\"%s\",\"availability\":\"listed\"}",
+                       count?",":"",qtitle,qfile,platform);
+                    if(written>0 && (size_t)written < 160000-used){used+=(size_t)written;count++;}
+                }
+            }
+        }
+        cursor=*end=='\n'?end+1:end;
+    }
+    used+=(size_t)snprintf(body+used,160000-used,"]}");
+    response(sock,200,"OK","application/json; charset=utf-8",body,used);
+    free(body);
+}
+
+/* Explicit self-test: download an XML metadata file from the same Archive host,
+ * write it to safe PS5 application storage, reread and verify, then delete.
+ * No commercial game data is fetched by the diagnostic endpoint. */
+static void test_download(int sock){
+    const char *url="https://archive.org/download/ultimate-rom-collection/ultimate-rom-collection_meta.xml";
+    size_t length=0;int status=0;
+    unsigned char *data=net_readall(url,2u*1024u*1024u,&length,&status);
+    if(!data) {
+        char msg[180];
+        snprintf(msg,sizeof msg,"PS5 HTTPS failed (status %d); catalog remains available offline",status);
+        error(sock,502,msg);
+        return;
+    }
+    if(length<128 || data[0]!='<' || !strstr((const char*)data,"metadata")){
+        free(data);error(sock,502,"Host returned unexpected data, not an XML metadata file");return;
+    }
+    if(mkdir(BASE_DIR,0700)<0 && errno!=EEXIST){
+        free(data);error(sock,500,"Cannot create RetroVerse data folder");return;
+    }
+    char path[512];snprintf(path,sizeof path,"%s/.archive-download-test.xml",BASE_DIR);
+    FILE *out=fopen(path,"wb");
+    if(!out){free(data);error(sock,500,"Cannot write test file to PS5 application data");return;}
+    int bad=fwrite(data,1,length,out)!=length;
+    if(fclose(out)!=0)bad=1;
+    unsigned char sample[64]={0};
+    FILE *in=fopen(path,"rb");
+    if(!in)bad=1;
+    else {size_t n=fread(sample,1,sizeof sample,in);if(n!=sizeof sample || memcmp(sample,data,sizeof sample)!=0)bad=1;fclose(in);}
+    unlink(path);free(data);
+    if(bad){error(sock,500,"PS5 storage could not verify a downloaded file");return;}
+    char body[230];snprintf(body,sizeof body,
+       "{\"ok\":true,\"host\":\"archive\",\"http_status\":%d,\"bytes_written\":%llu,\"verified\":true,\"test_file_removed\":true}",
+       status,(unsigned long long)length);
+    json(sock,200,body);
+}
+
 static int parse_header(const char *s,const char *key,unsigned long long *val){
     size_t len=strlen(key);const char *p=s;
     while(p&&*p){const char *nl=strstr(p,"\r\n");if(!nl)break;
@@ -458,6 +547,7 @@ static void serve(int sock) {
         if(!strcmp(path,"/")||!strcmp(path,"/index.html")){response(sock,200,"OK","text/html; charset=utf-8",ui_page,UI_PAGE_LEN);return;}
         if(!strcmp(path,"/api/health")){json(sock,200,"{\"ok\":true,\"mode\":\"ps5\",\"version\":\"0.3\",\"features\":[\"catalog\",\"art\",\"curated_source\",\"downloads\",\"upload\",\"library\"]}");return;}
         if(!strcmp(path,"/api/catalog-index")){catalog_index(sock,url);return;}
+        if(!strcmp(path,"/api/host-games")){host_games(sock,url);return;}
         if(!strcmp(path,"/api/curated/matches")){curated_matches(sock,url);return;}
         if(!strcmp(path,"/api/jobs")){jobs_response(sock);return;}
         if(!strcmp(path,"/api/library")){library_response(sock);return;}
@@ -473,6 +563,7 @@ static void serve(int sock) {
         while(have<len){ssize_t n=recv(sock,data+have,(size_t)len-have,0);if(n<=0){error(sock,400,"Incomplete request");return;}have+=(size_t)n;}
         data[have]=0;
         if(!strcmp(path,"/api/curated/download")){start_download(sock,data);return;}
+        if(!strcmp(path,"/api/test-download")){test_download(sock);return;}
         if(!strcmp(path,"/api/archive/cancel")){job.cancel=1;json(sock,200,"{\"ok\":true}");return;}
         error(sock,404,"Unsupported endpoint");return;
     }
