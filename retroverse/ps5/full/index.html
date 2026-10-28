@@ -96,7 +96,7 @@ nav button{flex:0 0 auto;white-space:nowrap;font-size:12px;padding:10px 12px}
 <section id="library" class="hidden"><h2>MY PS5 LIBRARY</h2><p class="subtle">Files imported or downloaded to /data/retroverse/roms/ on your PS5. No system files are modified.</p>
 <div class="actions"><button class="primary" id="refreshLibrary">REFRESH</button><select id="uploadPlatform"></select><input type="file" id="uploadFile" aria-label="Choose authorized game file"><button class="secondary" id="uploadButton">UPLOAD FROM PC / PHONE</button></div>
 <p class="subtle" id="uploadState"></p><div class="pane" id="libraryList">Loading…</div></section>
-<section id="downloads" class="hidden"><h2>DOWNLOAD MANAGER</h2><p class="subtle">Downloads are written directly by the PS5 payload to its RetroVerse library. Only download content you are authorized to use.</p><div class="actions"><button class="primary" id="storageCheck">1. TEST PS5 STORAGE</button><button class="primary" id="networkCheck">2. TEST PS5 HTTPS</button><button class="secondary" id="testDownload">3. FULL FILE TEST</button><button class="secondary" id="refreshJobs">REFRESH STATUS</button></div><p class="subtle">These separate checks isolate local folder permissions from HTTPS/network failures. Test 3 downloads a small public XML metadata file, verifies it on PS5 storage, and deletes it. No game files are downloaded.</p><div class="pane" id="diagnosticResults" style="white-space:pre-wrap">Run storage and HTTPS tests first.</div><p class="subtle" id="testResult"></p><div class="pane" id="jobs">No downloads yet.</div></section>
+<section id="downloads" class="hidden"><h2>DOWNLOAD MANAGER</h2><p class="subtle">Downloads are written directly by the PS5 payload to its RetroVerse library. Only download content you are authorized to use.</p><div class="actions"><button class="primary" id="storageCheck">1. TEST PS5 STORAGE</button><button class="primary" id="networkCheck">3. TEST NATIVE HTTPS</button><button class="primary" id="curlCheck">2. TEST SECURE CURL</button><button class="secondary" id="testDownload">4. FULL FILE TEST</button><button class="secondary" id="refreshJobs">REFRESH STATUS</button></div><p class="subtle">These checks isolate local storage, the new verified-certificate HTTPS transport, and the original PS5 HTTPS client. Test 4 downloads a small public XML metadata file, verifies it on PS5 storage, and deletes it. No game files are downloaded.</p><div class="pane" id="diagnosticResults" style="white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word">Run storage and HTTPS tests first.</div><p class="subtle" id="testResult"></p><div class="pane" id="jobs">No downloads yet.</div></section>
 </main>
 <dialog id="detailDialog" class="modal"><button class="secondary" id="closeDetail" style="float:right">✕ CLOSE</button>
 <div class="detail"><div><img id="detailArt" alt="Game cover"><img id="detailShot" alt="Game screenshot" style="margin-top:14px"></div>
@@ -306,25 +306,20 @@ function appendHostFile(e){
  line.append(info,b,open);root.appendChild(line);
  el('sourceStatus').textContent='The file is in the indexed Archive listing, but direct access is not guaranteed. Try the PS5 download test first. If it fails, use OPEN ON ARCHIVE and import a permitted downloaded file through MY LIBRARY.';
 }
-async function diag(kind) {
- var btn=el(kind==='storage'?'storageCheck':'networkCheck');
+async function diag(kind){
+ var btn=el(kind==='storage'?'storageCheck':kind==='curl'?'curlCheck':'networkCheck');
  btn.disabled=true;
- var text=el('diagnosticResults');
- text.textContent+='\\nTesting '+kind+'…';
- try {
+ var area=el('diagnosticResults');
+ area.textContent+='\nTesting '+kind+'…';
+ try{
   var result=await get('/api/diagnostics/'+kind,{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
-  if(result.ok) {
-    text.textContent+='\\nPASS '+kind.toUpperCase()+
-      (kind==='storage'?' — wrote, verified and removed test file in '+result.location:
-       ' — Archive HTTPS returned '+result.http_status+' and '+result.bytes_received+' bytes.');
+  if(result.ok){
+    area.textContent+='\nPASS '+kind.toUpperCase()+' — '+JSON.stringify(result);
   } else {
-    text.textContent+='\\nFAILED '+kind.toUpperCase()+' — '+JSON.stringify(result)+
-      (kind==='storage'?'\\nThe PS5 cannot save files to /data/retroverse.': '\\nThe console cannot fetch the Archive metadata file over HTTPS.');
+    area.textContent+='\nFAILED '+kind.toUpperCase()+'\n'+JSON.stringify(result,null,2);
   }
- } catch(e) {
-   text.textContent+='\\nERROR '+kind.toUpperCase()+': '+e.message;
- }
- btn.disabled=false;
+ }catch(e){area.textContent+='\nERROR '+kind.toUpperCase()+': '+e.message;}
+ area.scrollTop=area.scrollHeight;btn.disabled=false;
 }
 
 async function checkDownloadPipeline(){
@@ -367,6 +362,7 @@ el('hostRefresh').onclick=loadHostGames;
 el('hostFilter').oninput=renderHostCards;
 el('storageCheck').onclick=function(){diag('storage')};
 el('networkCheck').onclick=function(){diag('network')};
+el('curlCheck').onclick=function(){diag('curl')};
 el('testDownload').onclick=checkDownloadPipeline;
 el('hostPlatform').innerHTML=SYSTEMS.map(function(s){return '<option value="'+s[0]+'">'+s[1]+'</option>'}).join('');
 renderHostLetters();
