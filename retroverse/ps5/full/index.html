@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>RetroVerse PS5 · CoinOPS Store</title><style>
+:root{--accent:#ab99ff;--bg:#090e1d;--text:#ecf0ff;--muted:#bac3da}
+*{box-sizing:border-box}body{margin:0;background:#080c15;color:var(--text);font:16px system-ui,'Segoe UI',sans-serif}
+button,input,select{font:inherit}button{cursor:pointer}a{color:#abcaff}button:focus-visible,a:focus-visible{outline:3px solid white;outline-offset:3px}
+header{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:17px 3.5%;background:#080d1bdc;border-bottom:1px solid #ffffff22;position:sticky;top:0;z-index:6;backdrop-filter:blur(15px)}
+.brand{font-size:26px;font-weight:900;letter-spacing:-.06em}.brand b{color:var(--accent)}.status{font-size:12px;letter-spacing:.09em;color:#8eeda9}
+nav{display:flex;gap:6px}nav button,.tab{background:#ffffff10;color:#dfe6f6;border:1px solid #ffffff22;border-radius:10px;padding:10px 15px}nav button.active,.tab.active{background:var(--accent);color:#11101e;font-weight:800}
+.wrap{max-width:1680px;margin:auto;padding:20px 3.5% 90px}
+.systems{display:flex;gap:8px;overflow-x:auto;padding:6px 0 18px;scrollbar-color:var(--accent) transparent}
+.systems button{white-space:nowrap;padding:13px 20px;border:1px solid #ffffff25;background:#ffffff10;color:white;border-radius:10px;font-weight:750}
+.systems button.active{background:var(--accent);color:#090b17}
+.stage{position:relative;min-height:570px;border-radius:22px;overflow:hidden;background:#10162c;box-shadow:0 16px 90px #0008}
+.wall{position:absolute;inset:0;background-size:cover;background-position:center;opacity:.46;filter:blur(3px);transform:scale(1.03)}
+.stage:after{content:'';pointer-events:none;position:absolute;inset:0;background:linear-gradient(90deg,#03050c66,#05091418 43%,#040514d9)}
+.stage-content{position:relative;z-index:2;display:grid;grid-template-columns:54% 46%;min-height:570px;gap:0}
+.tvbox{display:grid;align-content:center;justify-content:center;position:relative;padding:35px}
+.tvbox img.cabinet{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;pointer-events:none}
+.tvscreen{width:58%;margin:12% auto 5%;position:relative;aspect-ratio:4/3;background:#060916;border:12px solid #090d15;border-radius:18px;box-shadow:0 0 40px #000b;overflow:hidden}
+.tvscreen img{width:100%;height:100%;object-fit:contain}
+.tvscreen:after{content:'';position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,#0000 0px,#0000 3px,#0004 4px);opacity:.48}
+.info{display:flex;flex-direction:column;justify-content:center;padding:50px 6% 50px 2%}
+.kicker{color:var(--accent);font-weight:850;letter-spacing:.22em;font-size:13px}.feature-title{font-size:clamp(32px,4.2vw,66px);line-height:1.02;letter-spacing:-.055em;margin:12px 0}
+.wheel{display:flex;flex-direction:column;gap:4px;max-height:370px;overflow:auto;scrollbar-width:thin;scrollbar-color:var(--accent) transparent}
+.wheel button{text-align:left;border:0;border-left:3px solid transparent;background:#05081870;color:#cbd2e2;padding:11px 17px;font-size:clamp(15px,1.45vw,23px);font-weight:750;text-shadow:0 2px 4px black}
+.wheel button.selected{border-color:var(--accent);color:white;background:#ffffff20;transform:translateX(-3px)}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:15px}.primary,.secondary{border-radius:10px;border:1px solid #ffffff28;padding:13px 17px;font-weight:800}.primary{background:var(--accent);color:#090b15}.secondary{background:#ffffff16;color:white}
+.subtle{color:var(--muted);line-height:1.55;font-size:14px}.row{display:flex;justify-content:space-between;gap:14px;align-items:center;flex-wrap:wrap;margin:28px 0 15px}
+h2{margin:0;font-size:25px}.letters{display:flex;flex-wrap:wrap;gap:5px;margin:16px 0}.letters button{min-width:33px;padding:8px;border:1px solid #ffffff26;background:#ffffff12;color:white;border-radius:5px}
+.letters button.active{background:var(--accent);color:#080b14;font-weight:900}
+input,select{padding:12px 13px;background:#171c30;color:white;border:1px solid #ffffff35;border-radius:10px}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px}.game{background:#ffffff0c;border:1px solid #ffffff18;color:white;border-radius:12px;overflow:hidden;text-align:left;padding:0}
+.game img{display:block;width:100%;height:200px;object-fit:contain;background:radial-gradient(#212b48,#080b17);padding:8px}.game strong{display:block;padding:9px 10px;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;font-size:13px}.game small{display:block;padding:0 10px 10px;color:var(--muted)}
+.pane{border:1px solid #ffffff1d;border-radius:14px;background:#131b2d;padding:20px;margin-top:15px}
+.hidden{display:none!important}.modal{border:1px solid #7184a0;background:#101626;color:white;border-radius:18px;max-width:830px;width:94vw;max-height:88vh;overflow:auto;padding:24px}
+.modal::backdrop{background:#050714dd}.detail{display:grid;grid-template-columns:34% 1fr;gap:24px}
+.detail img{max-width:100%;max-height:370px;object-fit:contain}.source{display:flex;gap:10px;align-items:center;justify-content:space-between;border:1px solid #ffffff22;border-radius:9px;padding:11px;margin:9px 0}
+.source button{background:var(--accent);border:0;padding:9px 13px;border-radius:8px;font-weight:700}
+.file{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 5px;border-bottom:1px solid #ffffff1c;overflow-wrap:anywhere}
+.pill{display:inline-block;padding:5px 9px;background:#324568;border-radius:30px;font-size:12px}
+.progress{height:8px;background:#293149;border-radius:100px;overflow:hidden;margin-top:6px}.progress div{height:100%;background:var(--accent)}
+footer{color:#98a9c9;text-align:center;font-size:12px;padding:40px 12px}
+@media(max-width:850px){.stage-content{grid-template-columns:1fr}.tvbox{min-height:280px;padding:0}.tvscreen{margin:8% auto;width:45%}.stage-content{min-height:0}.info{padding:20px}.stage{min-height:0}.detail{grid-template-columns:1fr}.feature-title{font-size:35px}}
+</style></head><body>
+<header><span class="brand">RETRO<b>VERSE</b> <small style="font-size:11px;letter-spacing:.1em">PS5</small></span>
+<nav><button class="tab active" data-tab="store">STORE</button><button class="tab" data-tab="library">MY LIBRARY</button><button class="tab" data-tab="downloads">DOWNLOADS</button></nav>
+<span class="status" id="connection">CONNECTING…</span></header>
+<main class="wrap">
+<section id="store">
+<div class="systems" id="systems"></div>
+<div class="stage"><div class="wall" id="wall"></div><div class="stage-content">
+<div class="tvbox"><img class="cabinet" id="cabinet" alt=""><div class="tvscreen"><img id="preview" alt="Selected game's screenshot"></div></div>
+<div class="info"><span class="kicker" id="systemName">WELCOME TO RETROVERSE</span><h1 class="feature-title" id="featureTitle">Select a game</h1><div class="wheel" id="wheel"></div>
+<div class="actions"><button class="primary" id="gameDetails">GAME DETAILS / DOWNLOAD</button><button class="secondary" id="prev">◀ PREVIOUS</button><button class="secondary" id="next">NEXT ▶</button></div></div></div></div>
+<div class="row"><h2 id="browseTitle">SNES GAMES · A</h2><input type="search" id="filter" placeholder="Filter games starting with A…" aria-label="Filter current letter"></div>
+<div class="letters" id="letters"></div><p class="subtle" id="catalogState">Loading catalog…</p><div class="cards" id="cards"></div>
+</section>
+<section id="library" class="hidden"><h2>MY PS5 LIBRARY</h2><p class="subtle">Files imported or downloaded to /data/retroverse/roms/ on your PS5. No system files are modified.</p>
+<div class="actions"><button class="primary" id="refreshLibrary">REFRESH</button><select id="uploadPlatform"></select><input type="file" id="uploadFile" aria-label="Choose authorized game file"><button class="secondary" id="uploadButton">UPLOAD FROM PC / PHONE</button></div>
+<p class="subtle" id="uploadState"></p><div class="pane" id="libraryList">Loading…</div></section>
+<section id="downloads" class="hidden"><h2>DOWNLOAD MANAGER</h2><p class="subtle">Downloads are written directly by the PS5 payload to its RetroVerse library. Only download content you are authorized to use.</p><button class="secondary" id="refreshJobs">REFRESH STATUS</button><div class="pane" id="jobs">No downloads yet.</div></section>
+</main>
+<dialog id="detailDialog" class="modal"><button class="secondary" id="closeDetail" style="float:right">✕ CLOSE</button>
+<div class="detail"><div><img id="detailArt" alt="Game cover"><img id="detailShot" alt="Game screenshot" style="margin-top:14px"></div>
+<div><span class="kicker" id="detailPlatform"></span><h2 id="detailTitle" style="margin:10px 0 12px;font-size:32px"></h2>
+<p class="subtle">Cover and screenshot data: Libretro Thumbnails. Catalog entries do not imply a download is offered or legally distributable.</p>
+<button class="primary" id="findDownload">CHECK CURATED ARCHIVE</button><p id="sourceStatus" class="subtle"></p><div id="sourceMatches"></div>
+<div class="source"><span>Add an authorized copy you already have</span><button id="importThis">UPLOAD FILE</button></div>
+<div class="source"><span>Open Vimm's Lair manually (external site)</span><button id="openVimm">OPEN</button></div>
+</div></div></dialog>
+<footer>RetroVerse PS5 Alpha · CoinOPS visual theme assets © respective contributors, CC BY-NC-SA 2.0 · <a href="https://github.com/nazdir/coinops-modified" target="_blank" rel="noopener">Theme credits</a> · Libretro thumbnails © respective rightsholders · Homebrew test, not a commercial store</footer>
+<script>
+'use strict';
+var SYSTEMS=[
+ ['SNES','SNES','Nintendo - Super Nintendo Entertainment System','snesna','#b9a3ff'],
+ ['NES','NES','Nintendo - Nintendo Entertainment System','nes','#f36c5f'],
+ ['GENESIS','GENESIS','Sega - Mega Drive - Genesis','genesis','#fd6382'],
+ ['GB','GAME BOY','Nintendo - Game Boy','gb','#a6d86f'],
+ ['GBA','GBA','Nintendo - Game Boy Advance','gba','#b6a0ff'],
+ ['N64','N64','Nintendo - Nintendo 64','n64','#62c6e6'],
+ ['PS1','PLAYSTATION','Sony - PlayStation','psx','#68a2ff'],
+ ['PS2','PS2','Sony - PlayStation 2','ps2','#7db9fb'],
+ ['DC','DREAMCAST','Sega - Dreamcast','dreamcast','#fca46b'],
+ ['ARCADE','ARCADE','MAME','arcade','#eec566']
+];
+var platform='SNES',letter='A',games=[],shown=[],selected=0,current=null,storeCache={},timer=null;
+function el(id){return document.getElementById(id)}
+function enc(s){return encodeURIComponent(s)}
+function esc(s){return String(s||'').replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','"':'&quot;'}[c]})}
+function sys(){return SYSTEMS.find(function(s){return s[0]===platform})}
+function thumb(base,name,kind){return 'https://thumbnails.libretro.com/'+enc(base)+'/'+kind+'/'+enc(name)+'.png'}
+function getArt(g,kind){return thumb(g.system||sys()[2],g.filename,kind)}
+function gameTitle(name){return name.replace(/\.png$/i,'').replace(/\s*\([^)]*\)/g,'').replace(/\s*\[[^\]]*\]/g,'').replace(/\s+/g,' ').trim()}
+function renderSystems(){
+ el('systems').innerHTML='';
+ SYSTEMS.forEach(function(s){var b=document.createElement('button');b.textContent=s[1];b.className=s[0]===platform?'active':'';b.onclick=function(){changeSystem(s[0])};el('systems').appendChild(b)});
+ ['uploadPlatform'].forEach(function(id){el(id).innerHTML=SYSTEMS.map(function(s){return '<option value="'+s[0]+'">'+s[1]+'</option>'}).join('')});
+}
+function changeSystem(p){platform=p;letter='A';el('filter').value='';renderSystems();theme();renderLetters();loadCatalog()}
+function theme(){
+ var s=sys(),base='https://raw.githubusercontent.com/nazdir/coinops-modified/master/_inc/systems/';
+ document.documentElement.style.setProperty('--accent',s[4]);
+ el('systemName').textContent=s[1]+' · GAME LIBRARY';
+ el('wall').style.backgroundImage='url("'+base+'fanart/'+s[3]+'.jpg")';
+ el('cabinet').src=base+'cabinets/'+s[3]+'.png';
+}
+function renderLetters(){
+ el('letters').replaceChildren();
+ '#ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').forEach(function(c){var b=document.createElement('button');b.textContent=c;b.className=c===letter?'active':'';b.onclick=function(){letter=c;el('filter').value='';renderLetters();draw()};el('letters').appendChild(b)});
+}
+async function get(url,opts){var r=await fetch(url,opts);var text=await r.text();if(!r.ok)throw Error((function(){try{return JSON.parse(text).error}catch(e){return text.slice(0,180)}})());if(opts&&opts.raw)return text;return JSON.parse(text)}
+function parseIndex(html){
+ var dom=new DOMParser().parseFromString(html,'text/html'),out=[],seen=new Set();
+ Array.from(dom.querySelectorAll('a[href]')).forEach(function(a){
+  var h=a.getAttribute('href');if(!h||!h.toLowerCase().endsWith('.png'))return;
+  var fname;try{fname=decodeURIComponent(h.substring(h.lastIndexOf('/')+1)).replace(/\.png$/i,'')}catch(e){return}
+  if(!fname||fname.length>180)return;
+  var title=gameTitle(fname),norm=title.toLowerCase();
+  if(!title||seen.has(norm))return;
+  seen.add(norm);out.push({title:title,filename:fname,system:sys()[2],platform:platform,region:(fname.match(/\((USA|Europe|Japan|World)\)/)||[])[1]||''});
+ });
+ return out.sort(function(a,b){return a.title.localeCompare(b.title)});
+}
+async function loadCatalog(){
+ var p=platform;el('catalogState').textContent='Loading '+sys()[1]+' catalog from Libretro…';
+ if(storeCache[p]){games=storeCache[p];draw();return}
+ try{
+  var html=await get('/api/catalog-index?platform='+enc(p),{raw:true});
+  if(p!==platform)return;
+  games=parseIndex(html);storeCache[p]=games;draw();
+ }catch(e){if(p!==platform)return;games=[];draw();el('catalogState').textContent='Catalog unavailable: '+e.message+'. Check console Internet/TLS access.'}
+}
+function entries(){
+ var q=el('filter').value.trim().toLowerCase();
+ return games.filter(function(g){var first=/^[a-z]/i.test(g.title)?g.title[0].toUpperCase():'#';return first===letter&&g.title.toLowerCase().includes(q)});
+}
+function draw(){
+ shown=entries();selected=0;
+ el('browseTitle').textContent=sys()[1]+' GAMES · '+letter;
+ el('catalogState').textContent=shown.length+' titles starting with '+letter+' · '+games.length+' catalog entries total';
+ var cards=el('cards');cards.replaceChildren();
+ shown.slice(0,300).forEach(function(g,i){var b=document.createElement('button');b.className='game';
+ var img=document.createElement('img');img.src=getArt(g,'Named_Boxarts');img.loading='lazy';img.alt='Cover for '+g.title;
+ var label=document.createElement('strong');label.textContent=g.title;var small=document.createElement('small');small.textContent=g.region||platform;
+ b.append(img,label,small);b.onclick=function(){showDetails(g)};cards.appendChild(b)});
+ drawWheel();
+}
+function drawWheel(){
+ var g=shown[selected];el('wheel').replaceChildren();
+ if(!g){el('featureTitle').textContent='No games under '+letter;el('preview').removeAttribute('src');return}
+ el('featureTitle').textContent=g.title;
+ el('preview').src=getArt(g,'Named_Snaps');el('preview').onerror=function(){el('preview').onerror=null;el('preview').src=getArt(g,'Named_Boxarts')};
+ var start=Math.max(0,selected-4),end=Math.min(shown.length,start+9);
+ for(var i=start;i<end;i++){(function(index){var b=document.createElement('button');b.textContent=shown[index].title;b.className=index===selected?'selected':'';b.onclick=function(){selected=index;drawWheel()};el('wheel').appendChild(b)})(i)}
+}
+function step(n){if(!shown.length)return;selected=(selected+n+shown.length)%shown.length;drawWheel()}
+function showDetails(g){
+ current=g;el('detailTitle').textContent=g.title;el('detailPlatform').textContent=sys()[1]+' · '+(g.region||'REGION UNSPECIFIED');
+ el('detailArt').src=getArt(g,'Named_Boxarts');el('detailShot').src=getArt(g,'Named_Snaps');
+ el('sourceStatus').textContent='Choose a source. Direct Archive availability is checked on demand.';
+ el('sourceMatches').replaceChildren();el('detailDialog').showModal();
+}
+async function findSources(){
+ var g=current;if(!g)return;
+ el('sourceStatus').textContent='Checking the selected Archive collection for '+g.title+'…';
+ el('sourceMatches').replaceChildren();
+ try{
+  var res=await get('/api/curated/matches?platform='+enc(g.platform)+'&title='+enc(g.title));
+  if(current!==g)return;
+  el('sourceStatus').textContent=res.supported?(res.files.length+' matched source files. Only download games you are authorized to use.'):'No curated collection configured for this console.';
+  res.files.forEach(function(f){
+   var line=document.createElement('div');line.className='source';var desc=document.createElement('span');desc.textContent=f.display_name;
+   var b=document.createElement('button');b.textContent='DOWNLOAD ↓';b.onclick=async function(){
+    if(!confirm('Download '+f.display_name+' to PS5 local storage?\nOnly continue if you have permission to use this copy.'))return;
+    b.disabled=true;
+    try{await get('/api/curated/download',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({platform:g.platform,filename:f.filename,title:g.title,rights_confirmed:true})});el('detailDialog').close();tab('downloads');loadJobs()}catch(e){alert('Download could not start: '+e.message);b.disabled=false}
+   };
+   line.append(desc,b);el('sourceMatches').appendChild(line)
+  });
+ }catch(e){el('sourceStatus').textContent='Source lookup unavailable: '+e.message}
+}
+function tab(name){
+ ['store','library','downloads'].forEach(function(n){el(n).classList.toggle('hidden',n!==name)});
+ document.querySelectorAll('nav .tab').forEach(function(b){b.classList.toggle('active',b.dataset.tab===name)});
+ if(name==='library')loadLibrary();if(name==='downloads')loadJobs();
+}
+async function loadLibrary(){
+ try{var x=await get('/api/library');var box=el('libraryList');box.replaceChildren();
+  if(!x.games.length){box.textContent='No games imported yet. Upload an authorized game file or download one from a supported source.';return}
+  x.games.forEach(function(g){var row=document.createElement('div');row.className='file';var title=document.createElement('span');title.textContent=g.platform+' / '+g.filename;row.appendChild(title);box.appendChild(row)});
+ }catch(e){el('libraryList').textContent='Library error: '+e.message}
+}
+async function uploadGame(){
+ var f=el('uploadFile').files[0],p=el('uploadPlatform').value;if(!f)return alert('Choose a file first.');
+ if(!confirm('Upload '+f.name+' ('+Math.ceil(f.size/1048576)+' MB) to your PS5? Only upload content you may legally use.'))return;
+ el('uploadState').textContent='Uploading '+f.name+'…';try{
+  var x=await get('/api/local/upload?platform='+enc(p)+'&filename='+enc(f.name),{method:'POST',headers:{'Content-Type':'application/octet-stream'},body:f});
+  el('uploadState').textContent='Saved to '+x.saved_to;loadLibrary()
+ }catch(e){el('uploadState').textContent='Upload failed: '+e.message}
+}
+async function loadJobs(){
+ try{var res=await get('/api/jobs');var root=el('jobs');root.replaceChildren();
+  if(!res.jobs.length){root.textContent='No active transfers.';return}
+  res.jobs.forEach(function(j){
+   var d=document.createElement('div');d.className='file';var left=document.createElement('div');left.style.flex='1';
+   left.textContent=j.filename+' · '+j.platform+' · '+j.status+(j.error?' — '+j.error:'');
+   var bar=document.createElement('div');bar.className='progress';var fill=document.createElement('div');fill.style.width=(j.total>0?Math.min(100,100*j.received/j.total):0)+'%';bar.appendChild(fill);left.appendChild(bar);d.appendChild(left);
+   if(j.status==='downloading'){var b=document.createElement('button');b.className='secondary';b.textContent='CANCEL';b.onclick=async function(){await get('/api/archive/cancel',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:j.id})});loadJobs()};d.appendChild(b)}
+   root.appendChild(d);
+  });
+ }catch(e){el('jobs').textContent='Status error: '+e.message}
+}
+document.querySelectorAll('nav .tab').forEach(function(b){b.onclick=function(){tab(b.dataset.tab)}});
+el('filter').oninput=draw;el('prev').onclick=function(){step(-1)};el('next').onclick=function(){step(1)};
+el('gameDetails').onclick=function(){if(shown[selected])showDetails(shown[selected])};
+el('closeDetail').onclick=function(){el('detailDialog').close()};
+el('findDownload').onclick=findSources;
+el('importThis').onclick=function(){el('detailDialog').close();tab('library');el('uploadPlatform').value=platform;el('uploadFile').click()};
+el('openVimm').onclick=function(){window.open('https://vimm.net/vault','_blank','noopener,noreferrer')};
+el('uploadButton').onclick=uploadGame;el('refreshLibrary').onclick=loadLibrary;el('refreshJobs').onclick=loadJobs;
+document.addEventListener('keydown',function(e){if(el('detailDialog').open||!el('store').classList.contains('hidden')===false)return;
+ if(e.key==='ArrowDown'){step(1);e.preventDefault()}else if(e.key==='ArrowUp'){step(-1);e.preventDefault()}
+ else if(e.key==='ArrowRight'){var ix='ABCDEFGHIJKLMNOPQRSTUVWXYZ'.indexOf(letter);letter='ABCDEFGHIJKLMNOPQRSTUVWXYZ'[(ix+1)%26];renderLetters();draw();e.preventDefault()}
+ else if(e.key==='ArrowLeft'){var ix='ABCDEFGHIJKLMNOPQRSTUVWXYZ'.indexOf(letter);letter='ABCDEFGHIJKLMNOPQRSTUVWXYZ'[(ix+25)%26];renderLetters();draw();e.preventDefault()}
+ else if(e.key==='Enter'&&shown[selected])showDetails(shown[selected]);
+});
+function padLoop(){var gp=navigator.getGamepads&&navigator.getGamepads()[0];if(gp&&!el('store').classList.contains('hidden')&&!el('detailDialog').open){var t=Date.now();if(!timer||t-timer>200){
+ var b=gp.buttons,axes=gp.axes;var down=(b[13]&&b[13].pressed)||axes[1]>.7,up=(b[12]&&b[12].pressed)||axes[1]<-.7;
+ if(down||up){step(down?1:-1);timer=t}
+ else if(b[0]&&b[0].pressed&&shown[selected]){showDetails(shown[selected]);timer=t}
+ }}requestAnimationFrame(padLoop)}requestAnimationFrame(padLoop);
+renderSystems();theme();renderLetters();loadCatalog();
+get('/api/health').then(function(x){el('connection').textContent=x.ok?'● PS5 ELF CONNECTED':'OFFLINE'}).catch(function(){el('connection').textContent='● OFFLINE'});
+setInterval(function(){if(!el('downloads').classList.contains('hidden'))loadJobs()},1600);
+</script></body></html>
