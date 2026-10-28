@@ -81,7 +81,7 @@ def raw_listing(platform,archive):
     if not html:return []
     parser=Links();parser.feed(html)
     print(platform,"requested",url,"redirected",final,"anchors",len(parser.links),flush=True)
-    if parser.links:print(platform,"anchor examples",[(a[:160],b[:120]) for a,b in parser.links[:8]],flush=True)
+    if parser.links:print(platform,"pagination hints",[(a[:180],b[:60]) for a,b in parser.links if ("page=" in a.lower() or "start=" in a.lower() or "next" in b.lower() or "more" in b.lower())][:20],flush=True)
     names=[]
     for href,label in parser.links:
         name=entry_name(href,label,archive)
