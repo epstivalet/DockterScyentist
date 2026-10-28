@@ -22,3 +22,30 @@ The PS5 ELF embeds a themed standalone storefront with A-Z game browsing, Libret
 The GitHub Actions workflow \`Build RetroVerse PS5 Store ELF\` creates the artifact \`RetroVerse-PS5-Store-ELF\`. Extract the ELF, load using your working jailbreak ELF loader, and navigate to \`http://PS5-IP:8765\` from a trusted device on the same LAN.
 
 This update can replace the previously tested RetroVerse first-boot payload. Restart/stop that existing server first to free TCP port 8765.
+
+## v0.6 - Download transport repair and test
+
+On-console diagnostics showed the PS5 storage test PASS, while the native
+sceHttpSendRequest failed before an HTTP response. The native HTTPS diagnostic
+remains available for comparison, but the downloads and small XML test now
+use PS5-targeted libcurl linked from the pinned PacBrew v0.40.2 release.
+
+The build verifies that release's SHA-256, compiles a trusted CA bundle from
+the CI runner into the ELF, and uses strict TLS peer/hostname verification.
+Only HTTPS URLs are allowed, including redirects.
+
+After installing, open DOWNLOADS and test:
+1. PS5 STORAGE (should still pass)
+2. SECURE CURL (new transport)
+3. NATIVE HTTPS (known previously failing transport; comparison)
+4. FULL FILE TEST (downloads a small XML metadata file, checks stored data,
+   then deletes the test copy)
+
+Only after CURL and FULL FILE both pass should the user attempt downloading
+an authorized game file from HOSTS. The host listing is an index, not proof
+every file is reachable. If CURL fails, record the full error text and avoid
+retrying large files until investigated.
+
+**Status:** GitHub compile is a build-level check. HTTPS and downloads still
+require testing on the user's actual PS5. No automatic fallback disables TLS
+certificate validation.
