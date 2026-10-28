@@ -1,0 +1,33 @@
+name: Build RetroVerse PS5 Alpha ELF
+on:
+  push:
+    branches: [retroverse-ps5-alpha]
+    paths:
+      - 'retroverse/**'
+      - '.github/workflows/build-retroverse-ps5-alpha.yml'
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install PS5 toolchain dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-18 lld-18 unzip wget make
+      - name: Install PS5 Payload SDK
+        run: |
+          wget -q -O /tmp/ps5-payload-sdk.zip https://github.com/ps5-payload-dev/sdk/releases/latest/download/ps5-payload-sdk.zip
+          sudo unzip -q /tmp/ps5-payload-sdk.zip -d /opt
+          test -f /opt/ps5-payload-sdk/toolchain/prospero.mk
+      - name: Compile ELF
+        env:
+          PS5_PAYLOAD_SDK: /opt/ps5-payload-sdk
+        run: |
+          make -C retroverse/ps5
+          file retroverse/ps5/retroverse-ps5-alpha.elf
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RetroVerse-PS5-Alpha-ELF
+          path: retroverse/ps5/retroverse-ps5-alpha.elf
+          if-no-files-found: error
