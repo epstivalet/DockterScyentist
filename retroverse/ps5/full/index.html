@@ -299,8 +299,12 @@ function appendHostFile(e){
    el('detailDialog').close();tab('downloads');loadJobs();
   }catch(err){alert('Download could not start: '+err.message);b.disabled=false}
  };
- line.append(info,b);root.appendChild(line);
- el('sourceStatus').textContent='The file is in the indexed Archive listing. Download availability is not guaranteed. Run the download test first.';
+ var open=document.createElement('a');
+ open.href='https://archive.org/download/ultimate-rom-collection/'+
+   e.filename.split('/').map(encodeURIComponent).join('/');
+ open.target='_blank';open.rel='noopener noreferrer';open.textContent='OPEN ON ARCHIVE';
+ line.append(info,b,open);root.appendChild(line);
+ el('sourceStatus').textContent='The file is in the indexed Archive listing, but direct access is not guaranteed. Try the PS5 download test first. If it fails, use OPEN ON ARCHIVE and import a permitted downloaded file through MY LIBRARY.';
 }
 async function checkDownloadPipeline(){
  var b=el('testDownload');b.disabled=true;
