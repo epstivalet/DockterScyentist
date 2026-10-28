@@ -22,6 +22,7 @@
 #include <sys/time.h>
 #include <unistd.h>
 #include "assets.inc"
+#include "catalog_data.inc"
 
 #define PORT 8765
 #define HEADER_MAX 16384
@@ -345,13 +346,16 @@ static void library_response(int sock){
 }
 static void catalog_index(int sock,const char *url){
     char p[32];param(url,"platform",p,sizeof p);
-    const char *sys=libretro_system(p);if(!sys){error(sock,400,"Unknown system");return;}
-    char encoded[300],remote[500];percent_encode(sys,encoded,sizeof encoded,0);
-    snprintf(remote,sizeof remote,"https://thumbnails.libretro.com/%s/Named_Boxarts/",encoded);
-    size_t len=0;int status=0;unsigned char *data=net_readall(remote,NET_MAX,&len,&status);
-    if(!data){error(sock,502,"Libretro catalog HTTPS request failed or exceeded limit");return;}
-    response(sock,200,"OK","text/html; charset=utf-8",data,len);free(data);
+    for(size_t i=0;i<sizeof embedded_catalogs/sizeof embedded_catalogs[0];i++){
+        if(!strcmp(p,embedded_catalogs[i].platform)){
+            response(sock,200,"OK","text/html; charset=utf-8",
+              embedded_catalogs[i].html,embedded_catalogs[i].length);
+            return;
+        }
+    }
+    error(sock,400,"No embedded catalog for requested platform");
 }
+
 static int suffix_rom(const char *s){return allowed_ext(s);}
 static void curated_matches(int sock,const char *url){
     char p[32],title[256];param(url,"platform",p,sizeof p);param(url,"title",title,sizeof title);
@@ -454,7 +458,7 @@ static void serve(int sock) {
     if(path_len>=sizeof path){error(sock,414,"URL too long");return;}memcpy(path,url,path_len);path[path_len]=0;
     if(!strcmp(method,"GET")){
         if(!strcmp(path,"/")||!strcmp(path,"/index.html")){response(sock,200,"OK","text/html; charset=utf-8",ui_page,UI_PAGE_LEN);return;}
-        if(!strcmp(path,"/api/health")){json(sock,200,"{\"ok\":true,\"mode\":\"ps5\",\"version\":\"0.2\",\"features\":[\"catalog\",\"art\",\"curated_source\",\"downloads\",\"upload\",\"library\"]}");return;}
+        if(!strcmp(path,"/api/health")){json(sock,200,"{\"ok\":true,\"mode\":\"ps5\",\"version\":\"0.3\",\"features\":[\"catalog\",\"art\",\"curated_source\",\"downloads\",\"upload\",\"library\"]}");return;}
         if(!strcmp(path,"/api/catalog-index")){catalog_index(sock,url);return;}
         if(!strcmp(path,"/api/curated/matches")){curated_matches(sock,url);return;}
         if(!strcmp(path,"/api/jobs")){jobs_response(sock);return;}
