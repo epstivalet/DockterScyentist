@@ -239,7 +239,7 @@ static void json_quote(const char *in,char *out,size_t max){
 }
 static void normalize(const char *raw,char *out,size_t max) {
     char name[512];snprintf(name,sizeof name,"%s",basename_s(raw));
-    char *dot=strrchr(name,'.');if(dot&&dot>name)*dot=0;
+    char *dot=strrchr(name,'.');if(dot&&dot>name&&allowed_ext(dot))*dot=0;
     int grouped=0;size_t j=0;int space=1;
     for(size_t i=0;name[i]&&j+1<max;i++){
         char c=name[i];if(c=='('||c=='['){grouped++;continue;}if(c==')'||c==']'){if(grouped)grouped--;continue;}if(grouped)continue;
