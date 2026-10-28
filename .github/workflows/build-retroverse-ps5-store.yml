@@ -31,6 +31,8 @@ jobs:
           Path('/tmp/retroverse-store-ui.js').write_text('\n'.join(scripts))
           PY
           node --check /tmp/retroverse-store-ui.js
+      - name: Collect curated Archive indexes at build time
+        run: python3 retroverse/ps5/full/archive_catalog_build.py
       - name: Build store ELF
         env:
           PS5_PAYLOAD_SDK: /opt/ps5-payload-sdk
