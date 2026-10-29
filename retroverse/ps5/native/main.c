@@ -36,6 +36,7 @@ static const System consoles[]={
  {"GB","GAME BOY","Nintendo - Game Boy",170,216,118},
  {"GBA","GAME BOY ADVANCE","Nintendo - Game Boy Advance",178,150,251},
  {"N64","NINTENDO 64","Nintendo - Nintendo 64",110,196,235},
+ {"GC","GAMECUBE","Nintendo - GameCube",155,124,239},
  {"PS1","PLAYSTATION","Sony - PlayStation",120,171,248},
  {"PS2","PLAYSTATION 2","Sony - PlayStation 2",123,149,237},
  {"DC","DREAMCAST","Sega - Dreamcast",251,166,108},
