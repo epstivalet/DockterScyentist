@@ -131,7 +131,7 @@ static void percent_decode(const char *src,char *dst,size_t max) {
     }dst[j]=0;
 }
 static int platform_ok(const char *p){
-    const char *s[]={"SNES","NES","GENESIS","GB","GBA","N64","PS1","PS2","DC","ARCADE"};
+    const char *s[]={"SNES","NES","GENESIS","GB","GBA","N64","GC","PS1","PS2","DC","ARCADE"};
     for(size_t i=0;i<sizeof(s)/sizeof(s[0]);i++)if(!strcmp(p,s[i]))return 1;
     return 0;
 }
@@ -142,6 +142,7 @@ static const char *libretro_system(const char *p){
     if(!strcmp(p,"GB"))return "Nintendo - Game Boy";
     if(!strcmp(p,"GBA"))return "Nintendo - Game Boy Advance";
     if(!strcmp(p,"N64"))return "Nintendo - Nintendo 64";
+    if(!strcmp(p,"GC"))return "Nintendo - GameCube";
     if(!strcmp(p,"PS1"))return "Sony - PlayStation";
     if(!strcmp(p,"PS2"))return "Sony - PlayStation 2";
     if(!strcmp(p,"DC"))return "Sega - Dreamcast";
@@ -155,6 +156,7 @@ static const char *curated_prefix(const char *p){
     if(!strcmp(p,"GB"))return "Nintendo - Game Boy.zip/";
     if(!strcmp(p,"GBA"))return "Nintendo - Game Boy Advance.zip/";
     if(!strcmp(p,"N64"))return "Nintendo - N64.zip/";
+    if(!strcmp(p,"GC"))return "Game cube/";
     if(!strcmp(p,"PS1"))return "Sony - PS1/";
     if(!strcmp(p,"DC"))return "Sega - Dreamcast.zip/";
     if(!strcmp(p,"ARCADE"))return "Arcade - Mame 2003 Plus.zip/";
@@ -164,7 +166,7 @@ static int endswith(const char *s,const char *suf){
     size_t a=strlen(s),b=strlen(suf);return a>=b&&!strcasecmp(s+a-b,suf);
 }
 static int allowed_ext(const char *f) {
-    static const char *exts[]={".zip",".7z",".nes",".sfc",".smc",".gb",".gbc",".gba",".n64",".z64",".v64",".md",".gen",".bin",".cue",".iso",".chd",".cso",".pbp",".gdi",".cdi",".m3u",".nds",".rom",".pce",".wad"};
+    static const char *exts[]={".zip",".7z",".nes",".sfc",".smc",".gb",".gbc",".gba",".n64",".z64",".v64",".md",".gen",".bin",".cue",".iso",".chd",".cso",".pbp",".gdi",".cdi",".m3u",".nds",".rom",".pce",".wad",".rvz",".gcm"};
     for(size_t i=0;i<sizeof(exts)/sizeof(exts[0]);i++)if(endswith(f,exts[i]))return 1;
     return 0;
 }
@@ -344,7 +346,7 @@ static void start_download(int sock,const char *body){
 static void library_response(int sock){
     char *body=malloc(250000);if(!body){error(sock,500,"Out of memory");return;}
     size_t used=0;used+=(size_t)snprintf(body+used,250000-used,"{\"games\":[");
-    int count=0;const char *p[]={"SNES","NES","GENESIS","GB","GBA","N64","PS1","PS2","DC","ARCADE"};
+    int count=0;const char *p[]={"SNES","NES","GENESIS","GB","GBA","N64","GC","PS1","PS2","DC","ARCADE"};
     for(size_t i=0;i<sizeof p/sizeof p[0];i++){
         char path[500];snprintf(path,sizeof path,"%s/%s",ROM_DIR,p[i]);
         DIR *d=opendir(path);if(!d)continue;
