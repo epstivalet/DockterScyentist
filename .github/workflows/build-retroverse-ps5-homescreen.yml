@@ -1,0 +1,75 @@
+name: Build RetroVerse PS5 Home Screen App
+on:
+  workflow_dispatch:
+  push:
+    branches: [retroverse-ps5-alpha]
+    paths:
+      - 'retroverse/ps5/home-screen/**'
+      - '.github/workflows/build-retroverse-ps5-homescreen.yml'
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install native build requirements and Pillow
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y clang-18 lld-18 make pkg-config tar unzip wget ninja-build cmake python3-pil
+      - name: Pin clean-room PS5 foreground app boilerplate
+        run: |
+          git clone -q https://github.com/drakmor/ps5-native-app-boilerplate.git /tmp/rv-native-template
+          cd /tmp/rv-native-template
+          git checkout -q 470695e0c557f99ff2df0e36e4df713c5e636526
+          test -f tools/build.sh
+          test -f src/demo_renderer.cpp
+      - name: Create the RetroVerse title, icon and native scene
+        run: |
+          cp retroverse/ps5/home-screen/main.cpp /tmp/rv-native-template/src/main.cpp
+          cd /tmp/rv-native-template
+          make init TITLE_ID=PPSA99873 APP_NAME="RetroVerse PS5" APP_CATEGORY=game
+          /usr/bin/python3 "$GITHUB_WORKSPACE/retroverse/ps5/home-screen/generate_icon.py" sce_sys/icon0.png
+          /usr/bin/python3 - <<'PY'
+          from PIL import Image
+          import json
+          with Image.open('sce_sys/icon0.png') as im:
+              assert im.size==(512,512) and im.format=='PNG'
+          p=json.load(open('sce_sys/param.json'))
+          assert p["titleId"]=="PPSA99873"
+          assert p["localizedParameters"]["en-US"]["titleName"]=="RetroVerse PS5"
+          PY
+      - name: Build PS5 FSELF app with runtime module
+        working-directory: /tmp/rv-native-template
+        run: |
+          make app
+          test -s dist/PPSA99873/eboot.bin
+          test -s dist/PPSA99873/sce_module/libc.prx
+          test -s dist/PPSA99873/sce_sys/icon0.png
+          test -s dist/PPSA99873/sce_sys/param.json
+          file dist/PPSA99873/eboot.bin
+      - name: Package installable title folder and checksums
+        run: |
+          cd /tmp/rv-native-template/dist
+          python3 - <<'PY'
+          from pathlib import Path
+          import zipfile
+          app=Path('PPSA99873')
+          out=Path('RetroVerse-PS5-HomeScreen-Display-Test.zip')
+          with zipfile.ZipFile(out,'w',compression=zipfile.ZIP_DEFLATED,compresslevel=8) as f:
+              for path in sorted(app.rglob('*')):
+                  if path.is_file():f.write(path,path.as_posix())
+          with zipfile.ZipFile(out) as f:
+              assert f.testzip() is None
+              assert {'PPSA99873/eboot.bin','PPSA99873/sce_sys/icon0.png',
+                      'PPSA99873/sce_sys/param.json','PPSA99873/sce_module/libc.prx'}<=set(f.namelist())
+          PY
+          sha256sum RetroVerse-PS5-HomeScreen-Display-Test.zip > SHA256SUMS
+          ls -lh RetroVerse-PS5-HomeScreen-Display-Test.zip
+      - name: Upload installable PS5 application folder
+        uses: actions/upload-artifact@v4
+        with:
+          name: RetroVerse-PS5-HomeScreen-Display-Test
+          path: |
+            /tmp/rv-native-template/dist/RetroVerse-PS5-HomeScreen-Display-Test.zip
+            /tmp/rv-native-template/dist/SHA256SUMS
+          if-no-files-found: error
