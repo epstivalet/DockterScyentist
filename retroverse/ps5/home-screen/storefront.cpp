@@ -28,12 +28,42 @@
 #include <fcntl.h>
 
 extern "C" {
-int scePadInit(void);
-int scePadOpen(int userId,int type,int index,const void*param);
-int scePadReadState(int handle,void*data);
-int sceUserServiceInitialize(const void*);
-int sceUserServiceGetInitialUser(int*);
+int sceKernelLoadStartModule(const char *path,size_t argc,const void *argv,
+                             unsigned flags,void *opt,int *result);
+int sceKernelDlsym(int module,const char *name,void **target);
 int sceKernelSendNotificationRequest(int,void*,size_t,int);
+}
+/* Resolve controller modules only AFTER the foreground VideoOut title has started.
+ * A missing controller service must never prevent the app itself from loading.
+ * The previous build statically linked libScePad/libSceUserService and
+ * triggered CE-107750-0 on at least one PS5 setup. */
+using PadInit=int (*)(void);
+using PadOpen=int (*)(int,int,int,const void*);
+using PadRead=int (*)(int,void*);
+using UserInit=int (*)(const void*);
+using UserInitial=int (*)(int*);
+static PadInit rv_pad_init=nullptr;
+static PadOpen rv_pad_open=nullptr;
+static PadRead rv_pad_read=nullptr;
+static UserInit rv_user_init=nullptr;
+static UserInitial rv_user_initial=nullptr;
+static int load_module(const char*absolute,const char*basename) {
+  int result=0;
+  int handle=sceKernelLoadStartModule(absolute,0,nullptr,0,nullptr,&result);
+  if(handle<0)handle=sceKernelLoadStartModule(basename,0,nullptr,0,nullptr,&result);
+  return handle;
+}
+static bool resolve_gamepad() {
+  int usermod=load_module("/system/common/lib/libSceUserService.sprx",
+                          "libSceUserService.sprx");
+  int padmod=load_module("/system/common/lib/libScePad.sprx","libScePad.sprx");
+  if(usermod<0||padmod<0)return false;
+  sceKernelDlsym(usermod,"sceUserServiceInitialize",(void**)&rv_user_init);
+  sceKernelDlsym(usermod,"sceUserServiceGetInitialUser",(void**)&rv_user_initial);
+  sceKernelDlsym(padmod,"scePadInit",(void**)&rv_pad_init);
+  sceKernelDlsym(padmod,"scePadOpen",(void**)&rv_pad_open);
+  sceKernelDlsym(padmod,"scePadReadState",(void**)&rv_pad_read);
+  return rv_user_initial && rv_pad_init && rv_pad_open && rv_pad_read;
 }
 namespace {
 using ps5::demo::Canvas;
@@ -512,13 +542,19 @@ extern "C" bool retroverse_process_input(){
  static int deferred_art=0,refresh=0;
  if(!initialized){
   initialized=true;
-  unsigned char userParams[64]={0};
-  sceUserServiceInitialize(userParams);
-  int user=-1;
-  if(sceUserServiceGetInitialUser(&user)>=0 && user>=0){
-   scePadInit();pad=scePadOpen(user,0,0,nullptr);
+  bool input_ready=resolve_gamepad();
+  if(input_ready){
+    unsigned char userParams[64]={0};
+    if(rv_user_init)rv_user_init(userParams);
+    int user=-1;
+    if(rv_user_initial(&user)>=0 && user>=0){
+      rv_pad_init();
+      pad=rv_pad_open(user,0,0,nullptr);
+    }
   }
   load_games();
+  if(!input_ready)std::snprintf(status,sizeof status,
+         "NATIVE VIDEO READY / DUALSENSE MODULE DID NOT LOAD");
   helper=helper_status();
   if(!helper&&!already_autostarted){
    already_autostarted=true;
@@ -530,7 +566,7 @@ extern "C" bool retroverse_process_input(){
  bool changed=false;
  if(pad>=0){
   PadState state={};
-  if(scePadReadState(pad,&state)>=0&&state.connected){
+  if(rv_pad_read(pad,&state)>=0&&state.connected){
    unsigned newpress=(state.buttons)&~last_buttons;
    last_buttons=state.buttons;
    if(newpress){input_action(newpress);changed=true;deferred_art=1;}
@@ -548,6 +584,6 @@ extern "C" bool retroverse_process_input(){
 }
 int main(){
  // Reaching this notification confirms executable linking and startup worked.
- notify("RetroVerse v0.8.1 booted / initializing native TV");
- ps5::demo::run(draw,"RetroVerse v0.8.1 native storefront displaying");
+ notify("RetroVerse v0.8.2 booted / initializing native TV");
+ ps5::demo::run(draw,"RetroVerse v0.8.2 native storefront displaying");
 }
