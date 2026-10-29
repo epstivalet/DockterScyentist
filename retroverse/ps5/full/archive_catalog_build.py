@@ -18,11 +18,12 @@ COLLECTIONS={
     "GB":"Nintendo - Game Boy.zip",
     "GBA":"Nintendo - Game Boy Advance.zip",
     "N64":"Nintendo - N64.zip",
+    "GC":"Game cube",
     "PS1":"Sony - PS1",
     "DC":"Sega - Dreamcast.zip",
     "ARCADE":"Arcade - Mame 2003 Plus.zip",
 }
-EXT=(".zip",".7z",".nes",".sfc",".smc",".gb",".gbc",".gba",".n64",".z64",".v64",".md",".gen",".bin",".cue",".iso",".chd",".cso",".pbp",".gdi",".cdi",".m3u",".nds",".rom",".pce",".wad")
+EXT=(".zip",".7z",".nes",".sfc",".smc",".gb",".gbc",".gba",".n64",".z64",".v64",".md",".gen",".bin",".cue",".iso",".chd",".cso",".pbp",".gdi",".cdi",".m3u",".nds",".rom",".pce",".wad",".rvz",".gcm")
 class Links(HTMLParser):
     def __init__(self):
         super().__init__()
