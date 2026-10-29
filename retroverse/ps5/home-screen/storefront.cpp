@@ -426,7 +426,7 @@ static void input_action(unsigned pressed){
   if(tab==0||tab==1)load_source();
  }
 }
-static void draw(Canvas&c){
+static void draw(Canvas&c) noexcept {
  const Console&sys=consoles[system_index];
  c.clear(bg);
  c.rectangle(0,0,1920,136,panel);
@@ -480,7 +480,7 @@ static void draw(Canvas&c){
     c.rectangle(992,y-7,835,43,pane2);
     c.rectangle(992,y-7,7,43,sys.accent);
    }
-   c.text(1018,y,games[i].title,4,start+row==highlight?white:muted,31);
+   c.text(1018,y,games[i].title,4,start+row==highlight?white:muted);
    row++;
   }
   if(!count)c.text(1010,701,"NO GAMES UNDER THIS LETTER",4,muted);
