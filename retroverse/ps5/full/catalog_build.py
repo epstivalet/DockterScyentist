@@ -18,6 +18,7 @@ SYSTEMS = {
     "GB": "Nintendo - Game Boy",
     "GBA": "Nintendo - Game Boy Advance",
     "N64": "Nintendo - Nintendo 64",
+    "GC": "Nintendo - GameCube",
     "PS1": "Sony - PlayStation",
     "PS2": "Sony - PlayStation 2",
     "DC": "Sega - Dreamcast",
