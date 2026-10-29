@@ -6,6 +6,8 @@
  * Art PNGs are decoded by stb_image, which is public-domain/MIT.
  */
 #include "demo_renderer.hpp"
+// The PS5 native runtime does not export libc's __assert helper.
+#define STBI_ASSERT(condition) ((void)0)
 #define STB_IMAGE_IMPLEMENTATION
 #define STBI_ONLY_PNG
 #define STBI_NO_STDIO
