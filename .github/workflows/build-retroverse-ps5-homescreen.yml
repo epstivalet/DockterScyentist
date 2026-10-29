@@ -64,7 +64,7 @@ jobs:
           from pathlib import Path
           path=Path("sce_sys/param.json")
           p=json.loads(path.read_text())
-          p["contentVersion"]="01.000.801"
+          p["contentVersion"]="01.000.802"
           path.write_text(json.dumps(p,indent=2)+"\n")
           PY
           /usr/bin/python3 "$GITHUB_WORKSPACE/retroverse/ps5/home-screen/generate_icon.py" sce_sys/icon0.png
@@ -87,6 +87,18 @@ jobs:
           test -s dist/PPSA99873/assets/retroverse-helper.elf
           test -s dist/PPSA99873/assets/catalog/GC.txt
           file dist/PPSA99873/eboot.bin
+          # The old native title imported Pad/UserService at process-load time
+          # and was rejected by this PS5 with CE-107750-0. Those are now
+          # resolved after VideoOut initialization, so their direct PRX imports
+          # must remain absent from the FSELF.
+          python3 - <<'PY'
+          from pathlib import Path
+          data=Path('dist/PPSA99873/eboot.bin').read_bytes()
+          for item in (b'libScePad.prx',b'libSceUserService.prx'):
+              assert item not in data, f'forbidden startup import: {item!r}'
+          assert b'libSceVideoOut.prx' in data
+          print("PASS: dynamic Pad/UserService, baseline VideoOut startup only")
+          PY
       - name: Package installable foreground store and checksum
         run: |
           cd /tmp/rv-native-template/dist
@@ -94,7 +106,7 @@ jobs:
           from pathlib import Path
           import zipfile
           app=Path('PPSA99873')
-          out=Path('RetroVerse-PS5-v0.8.1-Native-Store.zip')
+          out=Path('RetroVerse-PS5-v0.8.2-Native-Store.zip')
           with zipfile.ZipFile(out,'w',compression=zipfile.ZIP_DEFLATED,compresslevel=8) as f:
               for p in sorted(app.rglob('*')):
                   if p.is_file():f.write(p,p.as_posix())
@@ -106,12 +118,12 @@ jobs:
               assert needed <= set(f.namelist())
           print(out, out.stat().st_size)
           PY
-          sha256sum RetroVerse-PS5-v0.8.1-Native-Store.zip > SHA256SUMS
+          sha256sum RetroVerse-PS5-v0.8.2-Native-Store.zip > SHA256SUMS
       - name: Upload installable RetroVerse native storefront
         uses: actions/upload-artifact@v4
         with:
-          name: RetroVerse-PS5-v0.8.1-Native-Store
+          name: RetroVerse-PS5-v0.8.2-Native-Store
           path: |
-            /tmp/rv-native-template/dist/RetroVerse-PS5-v0.8.1-Native-Store.zip
+            /tmp/rv-native-template/dist/RetroVerse-PS5-v0.8.2-Native-Store.zip
             /tmp/rv-native-template/dist/SHA256SUMS
           if-no-files-found: error
