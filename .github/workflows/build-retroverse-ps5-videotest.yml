@@ -1,0 +1,41 @@
+name: Build RetroVerse PS5 VideoOut Diagnostic
+on:
+  workflow_dispatch:
+  push:
+    branches: [retroverse-ps5-alpha]
+    paths:
+      - '.github/workflows/build-retroverse-ps5-videotest.yml'
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install prerequisites
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y clang-18 lld-18 cmake ninja-build git unzip wget
+      - name: Install PS5 Payload SDK
+        run: |
+          wget -q -O /tmp/ps5sdk.zip https://github.com/ps5-payload-dev/sdk/releases/latest/download/ps5-payload-sdk.zip
+          sudo unzip -q /tmp/ps5sdk.zip -d /opt
+          test -x /opt/ps5-payload-sdk/bin/prospero-cmake
+      - name: Checkout pinned VideoOut v2 diagnostic
+        run: |
+          git clone -q https://github.com/br1cks4t1ts/ps5-moonlight.git /tmp/ps5-moonlight
+          git -C /tmp/ps5-moonlight checkout -q 6d1b65afeba305a51e7e8b3d7c0b83a461c9002f
+          test -f /tmp/ps5-moonlight/src/videotest/main.c
+      - name: Compile direct VideoOut test
+        env:
+          PS5_PAYLOAD_SDK: /opt/ps5-payload-sdk
+        run: |
+          /opt/ps5-payload-sdk/bin/prospero-cmake -S /tmp/ps5-moonlight -B /tmp/ps5-moonlight/build
+          cmake --build /tmp/ps5-moonlight/build --target videotest -j 2
+          file /tmp/ps5-moonlight/build/videotest.elf
+          test -s /tmp/ps5-moonlight/build/videotest.elf
+          cp /tmp/ps5-moonlight/build/videotest.elf retroverse-ps5-videoout-test.elf
+      - name: Upload diagnostic
+        uses: actions/upload-artifact@v4
+        with:
+          name: RetroVerse-PS5-VideoOut-Test-ELF
+          path: retroverse-ps5-videoout-test.elf
+          if-no-files-found: error
