@@ -664,6 +664,34 @@ static void upload(int sock,const char *url,const char *header,const unsigned ch
     snprintf(saved,sizeof saved,"roms/%s/%s",p,filename);
     json_quote(saved,quoted,sizeof quoted);snprintf(json_body,sizeof json_body,"{\"ok\":true,\"saved_to\":%s}",quoted);json(sock,200,json_body);
 }
+
+/* Read-only artwork proxy for installed foreground app.
+ * Strictly whitelisted thumbnail host + system name, bounded PNG size.
+ */
+static void cover_image(int sock,const char *request_url){
+    char platform[32],filename[350];
+    param(request_url,"platform",platform,sizeof platform);
+    param(request_url,"filename",filename,sizeof filename);
+    const char *system=libretro_system(platform);
+    if(!system||!filename[0]||strlen(filename)>240
+       ||strstr(filename,"..")||strchr(filename,'/')||strchr(filename,'\\')){
+        error(sock,400,"Invalid cover request");return;
+    }
+    char sysenc[400],nameenc[900],url[1600];
+    percent_encode(system,sysenc,sizeof sysenc,0);
+    percent_encode(filename,nameenc,sizeof nameenc,0);
+    snprintf(url,sizeof url,"https://thumbnails.libretro.com/%s/Named_Boxarts/%s.png",
+             sysenc,nameenc);
+    unsigned char *data=NULL;size_t length=0;
+    char err[260]={0};
+    int rc=rv_https_get_memory(url,4u*1024u*1024u,&data,&length,err,sizeof err);
+    if(rc!=0||length<8||memcmp(data,"\x89PNG\r\n\x1a\n",8)){
+        free(data);error(sock,404,"Cover not available or artwork host unreachable");return;
+    }
+    response(sock,200,"OK","image/png",data,length);
+    free(data);
+}
+
 static void serve(int sock) {
     unsigned char header[HEADER_MAX+1];size_t used=0;
     size_t split=0;
@@ -680,6 +708,7 @@ static void serve(int sock) {
     if(!strcmp(method,"GET")){
         if(!strcmp(path,"/")||!strcmp(path,"/index.html")){response(sock,200,"OK","text/html; charset=utf-8",ui_page,UI_PAGE_LEN);return;}
         if(!strcmp(path,"/api/health")){json(sock,200,"{\"ok\":true,\"mode\":\"ps5\",\"version\":\"0.6\",\"features\":[\"catalog\",\"art\",\"curated_source\",\"downloads\",\"upload\",\"library\"]}");return;}
+        if(!strcmp(path,"/api/cover")){cover_image(sock,url);return;}
         if(!strcmp(path,"/api/catalog-index")){catalog_index(sock,url);return;}
         if(!strcmp(path,"/api/host-games")){host_games(sock,url);return;}
         if(!strcmp(path,"/api/curated/matches")){curated_matches(sock,url);return;}
