@@ -1,31 +1,59 @@
-name: Build RetroVerse PS5 Home Screen App
+name: Build RetroVerse PS5 Installable Native Store v0.8
 on:
   workflow_dispatch:
   push:
     branches: [retroverse-ps5-alpha]
     paths:
       - 'retroverse/ps5/home-screen/**'
+      - 'retroverse/ps5/full/**'
       - '.github/workflows/build-retroverse-ps5-homescreen.yml'
 jobs:
   package:
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - name: Install native build requirements and Pillow
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y clang-18 lld-18 make pkg-config tar unzip wget ninja-build cmake python3-pil
-      - name: Pin clean-room PS5 foreground app boilerplate
+          sudo apt-get install -y clang-18 lld-18 make pkg-config tar unzip wget curl git ninja-build cmake python3-pil ca-certificates
+      - name: Install PS5 SDK and verified PacBrew HTTPS dependencies
+        run: |
+          wget -q -O /tmp/ps5-payload-sdk.zip \
+            https://github.com/ps5-payload-dev/sdk/releases/latest/download/ps5-payload-sdk.zip
+          sudo unzip -q /tmp/ps5-payload-sdk.zip -d /opt
+          curl -fL --retry 3 -o /tmp/pacbrew.tar.gz \
+            https://github.com/ps5-payload-dev/pacbrew-repo/releases/download/v0.40.2/ps5-payload-dev.tar.gz
+          echo "a85f65de418a8e6a898c6c3e3c870d50fff7618a200e4dd59ea9692af6ecec4d  /tmp/pacbrew.tar.gz" | sha256sum -c -
+          sudo tar -xzf /tmp/pacbrew.tar.gz -C / opt/ps5-payload-sdk/target/user
+      - name: Compile proven PS5 helper with artwork proxy and GameCube
+        env:
+          PS5_PAYLOAD_SDK: /opt/ps5-payload-sdk
+        run: |
+          make -C retroverse/ps5/full
+          test -s retroverse/ps5/full/retroverse-ps5-store.elf
+      - name: Pin known working PS5 foreground VideoOut app boilerplate
         run: |
           git clone -q https://github.com/drakmor/ps5-native-app-boilerplate.git /tmp/rv-native-template
-          cd /tmp/rv-native-template
-          git checkout -q 470695e0c557f99ff2df0e36e4df713c5e636526
-          test -f tools/build.sh
-          test -f src/demo_renderer.cpp
-      - name: Create the RetroVerse title, icon and native scene
+          git -C /tmp/rv-native-template checkout -q 470695e0c557f99ff2df0e36e4df713c5e636526
+          test -f /tmp/rv-native-template/src/demo_renderer.cpp
+      - name: Install source and dynamic native game browsing renderer
         run: |
-          cp retroverse/ps5/home-screen/main.cpp /tmp/rv-native-template/src/main.cpp
+          cp retroverse/ps5/home-screen/storefront.cpp /tmp/rv-native-template/src/main.cpp
+          python3 retroverse/ps5/home-screen/patch_renderer.py /tmp/rv-native-template
+          curl -fL --retry 3 -o /tmp/rv-native-template/src/stb_image.h \
+            https://raw.githubusercontent.com/nothings/stb/003501f6d7a8668ce8b6d875e34dd97ad0d5d5b5/stb_image.h
+          test "$(git hash-object /tmp/rv-native-template/src/stb_image.h)" = "9eedabedc45b3e6fd88fae6f14a160b4d53272ec"
+      - name: Embed all game catalogs, indexed host files, and helper ELF
+        run: |
+          mkdir -p /tmp/rv-native-template/assets
+          python3 retroverse/ps5/home-screen/build_catalog_assets.py /tmp/rv-native-template/assets
+          cp retroverse/ps5/full/retroverse-ps5-store.elf \
+            /tmp/rv-native-template/assets/retroverse-helper.elf
+          test -s /tmp/rv-native-template/assets/catalog/GC.txt
+          test -s /tmp/rv-native-template/assets/catalog/HOST_GC.txt
+      - name: Configure existing RetroVerse title identity and icon
+        run: |
           cd /tmp/rv-native-template
           make init TITLE_ID=PPSA99873 APP_NAME="RetroVerse PS5" APP_CATEGORY=game
           /usr/bin/python3 "$GITHUB_WORKSPACE/retroverse/ps5/home-screen/generate_icon.py" sce_sys/icon0.png
@@ -38,38 +66,41 @@ jobs:
           assert p["titleId"]=="PPSA99873"
           assert p["localizedParameters"]["en-US"]["titleName"]=="RetroVerse PS5"
           PY
-      - name: Build PS5 FSELF app with runtime module
+      - name: Build signed native frontend and complete app folder
         working-directory: /tmp/rv-native-template
         run: |
           make app
           test -s dist/PPSA99873/eboot.bin
           test -s dist/PPSA99873/sce_module/libc.prx
           test -s dist/PPSA99873/sce_sys/icon0.png
-          test -s dist/PPSA99873/sce_sys/param.json
+          test -s dist/PPSA99873/assets/retroverse-helper.elf
+          test -s dist/PPSA99873/assets/catalog/GC.txt
           file dist/PPSA99873/eboot.bin
-      - name: Package installable title folder and checksums
+      - name: Package installable foreground store and checksum
         run: |
           cd /tmp/rv-native-template/dist
           python3 - <<'PY'
           from pathlib import Path
           import zipfile
           app=Path('PPSA99873')
-          out=Path('RetroVerse-PS5-HomeScreen-Display-Test.zip')
+          out=Path('RetroVerse-PS5-v0.8-Native-Store.zip')
           with zipfile.ZipFile(out,'w',compression=zipfile.ZIP_DEFLATED,compresslevel=8) as f:
-              for path in sorted(app.rglob('*')):
-                  if path.is_file():f.write(path,path.as_posix())
+              for p in sorted(app.rglob('*')):
+                  if p.is_file():f.write(p,p.as_posix())
           with zipfile.ZipFile(out) as f:
               assert f.testzip() is None
-              assert {'PPSA99873/eboot.bin','PPSA99873/sce_sys/icon0.png',
-                      'PPSA99873/sce_sys/param.json','PPSA99873/sce_module/libc.prx'}<=set(f.namelist())
+              needed={'PPSA99873/eboot.bin','PPSA99873/sce_sys/icon0.png',
+                      'PPSA99873/sce_sys/param.json','PPSA99873/sce_module/libc.prx',
+                      'PPSA99873/assets/retroverse-helper.elf','PPSA99873/assets/catalog/GC.txt'}
+              assert needed <= set(f.namelist())
+          print(out, out.stat().st_size)
           PY
-          sha256sum RetroVerse-PS5-HomeScreen-Display-Test.zip > SHA256SUMS
-          ls -lh RetroVerse-PS5-HomeScreen-Display-Test.zip
-      - name: Upload installable PS5 application folder
+          sha256sum RetroVerse-PS5-v0.8-Native-Store.zip > SHA256SUMS
+      - name: Upload installable RetroVerse native storefront
         uses: actions/upload-artifact@v4
         with:
-          name: RetroVerse-PS5-HomeScreen-Display-Test
+          name: RetroVerse-PS5-v0.8-Native-Store
           path: |
-            /tmp/rv-native-template/dist/RetroVerse-PS5-HomeScreen-Display-Test.zip
+            /tmp/rv-native-template/dist/RetroVerse-PS5-v0.8-Native-Store.zip
             /tmp/rv-native-template/dist/SHA256SUMS
           if-no-files-found: error
