@@ -63,7 +63,7 @@ const Console consoles[]={
 constexpr int systems=int(sizeof(consoles)/sizeof(consoles[0]));
 constexpr int maxgames=8000;
 struct Game {char title[190];char original[250];char source[520];};
-static Game games[maxgames];
+static Game *games=nullptr;
 static int ngames=0,system_index=0,tab=0,letter='A',highlight=0;
 static bool dialog=false,helper=false,already_autostarted=false,loading_art=false,cover_attempted=false;
 static int pad=-1;
@@ -137,6 +137,10 @@ static int read_file(const char*path,char*buffer,size_t cap){
  ::close(fd);buffer[len]=0;return int(len);
 }
 static void load_games(){
+ if(!games){
+    games=(Game*)std::calloc(maxgames,sizeof(Game));
+    if(!games){std::snprintf(status,sizeof status,"NOT ENOUGH MEMORY FOR GAME INDEX");ngames=0;return;}
+ }
  ngames=0;highlight=0;dialog=false;selected_source[0]=0;cover_attempted=false;
  if(artpixels){std::free(artpixels);artpixels=nullptr;}artkey[0]=0;
  char path[250];
@@ -543,5 +547,7 @@ extern "C" bool retroverse_process_input(){
  return changed;
 }
 int main(){
- ps5::demo::run(draw,"RetroVerse Store is running on PS5 TV");
+ // Reaching this notification confirms executable linking and startup worked.
+ notify("RetroVerse v0.8.1 booted / initializing native TV");
+ ps5::demo::run(draw,"RetroVerse v0.8.1 native storefront displaying");
 }
