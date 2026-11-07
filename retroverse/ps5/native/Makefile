@@ -32,7 +32,7 @@ ui.o: main.c ../full/curl_net.h
 	$(CC) $(CFLAGS) -c -o $@ main.c
 
 $(ELF): backend.o curl_net.o torrent_bridge.o ui.o
-	$(CC) $(CFLAGS) -o $@ ui.o backend.o curl_net.o $(LIBS)
+	$(CC) $(CFLAGS) -o $@ ui.o backend.o curl_net.o torrent_bridge.o $(LIBS)
 
 clean:
 	rm -f $(ELF) backend.o curl_net.o torrent_bridge.o ui.o
