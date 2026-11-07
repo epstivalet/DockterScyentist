@@ -99,6 +99,7 @@ static bool dialog=false,helper=false,already_autostarted=false,loading_art=fals
 static int pad=-1;
 static char status[600]="RETROVERSE v0.9 NATIVE STORE LOADING";
 static char transfer[520]="NO TRANSFER ACTIVE";
+static char torrent_line[520]="TORRENT ENGINE NOT CHECKED";
 static char selected_source[700]="";
 static unsigned last_buttons=0;
 static int artw=0,arth=0;
@@ -175,8 +176,10 @@ static void load_games(){
  if(artpixels){std::free(artpixels);artpixels=nullptr;}artkey[0]=0;
  char path[250];
  if(tab==3){
-  std::snprintf(status,sizeof status,"DOWNLOADS / PRESS SQUARE TO REFRESH");
-  return;
+  std::snprintf(status,sizeof status,"DOWNLOADS / PRESS SQUARE TO REFRESH");return;
+ }
+ if(tab==4){
+  std::snprintf(status,sizeof status,"TORRENTS / PASTE MAGNETS FROM WEB UI");return;
  }
  if(tab==2){
   if(!helper){std::snprintf(status,sizeof status,"LIBRARY NEEDS DOWNLOADER HELPER");return;}
@@ -349,6 +352,27 @@ static void refresh_jobs(){
  }else std::snprintf(transfer,sizeof transfer,"VERIFIED DOWNLOADER OFFLINE");
  free_resp(r);
 }
+static void refresh_torrents(){
+ if(!helper){std::snprintf(torrent_line,sizeof torrent_line,"RETROVERSE HELPER OFFLINE");return;}
+ Response state=http("GET","/api/torrent/status",nullptr,2500);
+ if(state.http!=200||!state.data){
+    std::snprintf(torrent_line,sizeof torrent_line,"PS5TORRENT OFFLINE / START ITS ELF");
+    free_resp(state);return;
+ }
+ free_resp(state);
+ Response q=http("GET","/api/torrent/list",nullptr,24000);
+ if(q.http==200&&q.data){
+   const char*start=(char*)q.data;int count=0;
+   for(const char*p=start;(p=std::strstr(p,"\"id\":"))!=nullptr;p+=5)count++;
+   const char*name=std::strstr(start,"\"name\":\"");
+   if(name){
+      name+=8;char visible[150]={0};size_t i=0;
+      while(name[i]&&name[i]!='"'&&i+1<sizeof visible){visible[i]=name[i];i++;}
+      std::snprintf(torrent_line,sizeof torrent_line,"%d TORRENTS / FIRST: %.140s",count,visible);
+   }else std::snprintf(torrent_line,sizeof torrent_line,"NO ACTIVE TORRENTS");
+ }else std::snprintf(torrent_line,sizeof torrent_line,"TORRENT QUEUE UNAVAILABLE");
+ free_resp(q);
+}
 static void load_source(){
  selected_source[0]=0;
  Game*g=selected();if(!g)return;
@@ -433,9 +457,10 @@ static void input_action(unsigned pressed){
   else if(tab==3)refresh_jobs();
  }
  if(pressed&BTN_TRI){
-  dialog=false;tab=(tab+1)%4;load_games();
+  dialog=false;tab=(tab+1)%5;load_games();
   if(tab==2)load_library();
   if(tab==3)refresh_jobs();
+   if(tab==4)refresh_torrents();
   return;
  }
  if(pressed&BTN_O){dialog=false;return;}
@@ -458,7 +483,7 @@ static void input_action(unsigned pressed){
  int total=filtered_count();
  if((pressed&BTN_DOWN)&&total){highlight=(highlight+1)%total;artkey[0]=0;cover_clear();}
  if((pressed&BTN_UP)&&total){highlight=(highlight+total-1)%total;artkey[0]=0;cover_clear();}
- if((pressed&BTN_X)&&selected()&&tab!=3){
+ if((pressed&BTN_X)&&selected()&&tab<3){
   dialog=true;
   if(tab==0||tab==1)load_source();
  }
@@ -470,7 +495,7 @@ static void draw(Canvas&c) noexcept {
  c.rectangle(0,132,1920,6,sys.accent);
  c.text(70,30,"RETROVERSE",11,white);
  c.text(1180,43,"PS5 NATIVE STORE",6,sys.accent);
- const char*tabs[]={"STORE","HOSTS","MY LIBRARY","DOWNLOADS"};
+ const char*tabs[]={"STORE","HOSTS","MY LIBRARY","DOWNLOADS","TORRENTS"};
  for(int i=0;i<4;i++){
   unsigned x=68+306*unsigned(i);
   c.rectangle(x,171,288,65,i==tab?sys.accent:pane2);
@@ -580,11 +605,11 @@ extern "C" bool retroverse_process_input(){
  if(helper&&tab<2&&!dialog&&deferred_art){
   deferred_art=0;get_cover();changed=true;
  }
- if(tab==3&&++refresh>=50){refresh=0;refresh_jobs();changed=true;}
+ if((tab==3||tab==4)&&++refresh>=50){refresh=0;if(tab==3)refresh_jobs();else refresh_torrents();changed=true;}
  return changed;
 }
 int main(){
  // Reaching this notification confirms executable linking and startup worked.
- notify("RetroVerse v0.8.2 booted / initializing native TV");
- ps5::demo::run(draw,"RetroVerse v0.9 native storefront displaying");
+ notify("RetroVerse v0.10 booted / initializing native TV");
+ ps5::demo::run(draw,"RetroVerse v0.10 native storefront displaying");
 }
