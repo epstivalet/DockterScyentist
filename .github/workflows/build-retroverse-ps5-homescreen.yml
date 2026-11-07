@@ -53,7 +53,8 @@ jobs:
           cp retroverse/ps5/full/retroverse-ps5-store.elf \
             /tmp/rv-native-template/assets/retroverse-helper.elf
           test -s /tmp/rv-native-template/assets/catalog/GC.txt
-          test -f /tmp/rv-native-template/assets/catalog/HOST_GC.txt\n          test -s /tmp/rv-native-template/assets/catalog/HOST_GENESIS.txt
+          test -f /tmp/rv-native-template/assets/catalog/HOST_GC.txt
+          test -s /tmp/rv-native-template/assets/catalog/HOST_GENESIS.txt
       - name: Configure existing RetroVerse title identity and icon
         run: |
           cd /tmp/rv-native-template
@@ -87,7 +88,8 @@ jobs:
           test -s dist/PPSA99873/sce_module/libc.prx
           test -s dist/PPSA99873/sce_sys/icon0.png
           test -s dist/PPSA99873/assets/retroverse-helper.elf
-          test -s dist/PPSA99873/assets/catalog/GC.txt\n          test -s dist/PPSA99873/assets/catalog/HOST_GENESIS.txt
+          test -s dist/PPSA99873/assets/catalog/GC.txt
+          test -s dist/PPSA99873/assets/catalog/HOST_GENESIS.txt
           file dist/PPSA99873/eboot.bin
           # The old native title imported Pad/UserService at process-load time
           # and was rejected by this PS5 with CE-107750-0. Those are now
