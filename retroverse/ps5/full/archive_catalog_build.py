@@ -1,113 +1,106 @@
 #!/usr/bin/env python3
-"""Create read-only curated-collection file indexes at build time.
-The console then needs NO HTTP request to list files. Downloading remains a separate HTTPS test.
+"""Generate a download allowlist from the two user-selected Archive directories.
+
+Only names and HTTPS URLs are embedded: no game content is bundled. An
+unavailable/empty directory fails the build rather than silently advertising
+downloads that have not been indexed.
 """
-from html import unescape
 from html.parser import HTMLParser
 from pathlib import Path
-from urllib.parse import quote, unquote, urlparse, parse_qs
+from urllib.parse import quote, unquote, urljoin, urlsplit
 from urllib.request import Request, urlopen
-import re, time
+import time
 
-ITEM="ultimate-rom-collection"
-# Displayed Archive.org direct paths, not arbitrary websites.
-COLLECTIONS={
-    "SNES":"Nintendo - SNES.zip",
-    "NES":"Nintendo - NES.zip",
-    "GENESIS":"Sega - Genesis.zip",
-    "GB":"Nintendo - Game Boy.zip",
-    "GBA":"Nintendo - Game Boy Advance.zip",
-    "N64":"Nintendo - N64.zip",
-    "GC":"Game cube",
-    "PS1":"Sony - PS1",
-    "DC":"Sega - Dreamcast.zip",
-    "ARCADE":"Arcade - Mame 2003 Plus.zip",
+SOURCES = {
+    "GC": ("https://archive.org/download/gamecubegames/Nintendo%20GameCube/",
+           (".iso", ".gcm", ".rvz")),
+    "SNES": ("https://archive.org/download/super-nintendo-snes-rom-collection-usa/",
+             (".zip", ".sfc", ".smc")),
 }
-EXT=(".zip",".7z",".nes",".sfc",".smc",".gb",".gbc",".gba",".n64",".z64",".v64",".md",".gen",".bin",".cue",".iso",".chd",".cso",".pbp",".gdi",".cdi",".m3u",".nds",".rom",".pce",".wad",".rvz",".gcm")
+OUT = Path(__file__).with_name("archive_data.inc")
+
 class Links(HTMLParser):
     def __init__(self):
         super().__init__()
-        self.links=[];self.href=None;self.text=[]
-    def handle_starttag(self,tag,attrs):
-        if tag=='a':
-            self.href=dict(attrs).get('href','')
-            self.text=[]
-    def handle_data(self,data):
-        if self.href is not None:self.text.append(data)
-    def handle_endtag(self,tag):
-        if tag=='a' and self.href is not None:
-            self.links.append((unescape(self.href), unescape(''.join(self.text)).strip()))
-            self.href=None;self.text=[]
+        self.hrefs = []
+    def handle_starttag(self, tag, attrs):
+        if tag.lower() == "a":
+            href = dict(attrs).get("href")
+            if href:
+                self.hrefs.append(href)
 
-def remote_get(url):
-    for attempt in range(2):
+def safe_file(name):
+    if not name or len(name.encode("utf-8")) > 220 or name[0] == ".":
+        return False
+    return all(ord(ch) >= 32 and ch not in '/\\\\:<>|"?' for ch in name)
+
+def cstr(s):
+    out = '"'
+    for b in s.encode("utf-8"):
+        if b == 34:
+            out += '\\"'
+        elif b == 92:
+            out += '\\\\'
+        elif 32 <= b < 127:
+            out += chr(b)
+        else:
+            out += "\\%03o" % b
+    return out + '"'
+
+def fetch(base):
+    last = None
+    for attempt in range(3):
         try:
-            req=Request(url,headers={"User-Agent":"Mozilla/5.0 (compatible; RetroVerse-PS5-Builder/0.4)"})
-            with urlopen(req,timeout=45) as f:
-                final=f.geturl(); raw=f.read(18*1024*1024+1)
-            if len(raw)>18*1024*1024:raise RuntimeError("Large index; skip")
-            return final,raw.decode("utf-8","replace")
+            req = Request(base, headers={"User-Agent": "Mozilla/5.0 RetroVerse/0.11"})
+            with urlopen(req, timeout=50) as resp:
+                data = resp.read(16 * 1024 * 1024 + 1)
+            if len(data) > 16 * 1024 * 1024:
+                raise ValueError("Directory index exceeds size limit")
+            return data.decode("utf-8", "replace")
         except Exception as e:
-            print("Archive index fetch failed",repr(e),url,flush=True)
-            if attempt==0:time.sleep(1)
-    return "", ""
+            last = e
+            time.sleep(attempt + 1)
+    raise RuntimeError(f"Cannot fetch the Archive directory {base}: {last}")
 
-def entry_name(href,text,archive):
-    # Only entries with a recognizable game file extension. No constructed redirects.
-    # Archive 'View Contents' can have query parameters listing specific filenames.
-    href=unquote(href);txt=unquote(text).strip().replace("\x00","")
-    names=[]
-    if txt:names.append(txt)
-    u=urlparse(href)
-    qs=parse_qs(u.query)
-    for k in ("file","filename","path"):
-        names.extend(qs.get(k,[]))
-    # Some Archive viewer links contain a leading dir or 'zip/path' shape.
-    names.append(u.path)
-    for candidate in names:
-        candidate=unquote(candidate).strip()
-        if ".zip/" in candidate: candidate=candidate.split(".zip/",1)[1]
-        candidate=candidate.strip("/")
-        if candidate.startswith(archive+"/"):candidate=candidate[len(archive)+1:]
-        if candidate.startswith("download/"+ITEM+"/"):candidate=candidate.split("download/"+ITEM+"/",1)[1]
-        if candidate.startswith(archive+"/"):candidate=candidate[len(archive)+1:]
-        if candidate.lower().endswith(EXT) and "/" not in candidate and ".." not in candidate and len(candidate)<240:
-            return candidate
-    return None
-
-def raw_listing(platform,archive):
-    suffix = archive + ("/" if archive.endswith(".zip") else "/")
-    url="https://archive.org/download/"+ITEM+"/"+quote(archive,safe="")+"/"
-    final,html=remote_get(url)
-    if not html:return []
-    parser=Links();parser.feed(html)
-    print(platform,"requested",url,"redirected",final,"anchors",len(parser.links),flush=True)
-    if parser.links:print(platform,"pagination hints",[(a[:180],b[:60]) for a,b in parser.links if ("page=" in a.lower() or "start=" in a.lower() or "next" in b.lower() or "more" in b.lower())][:20],flush=True)
-    names=[]
-    for href,label in parser.links:
-        name=entry_name(href,label,archive)
-        if name:names.append(name)
-    uniq=sorted(set(names),key=str.casefold)
-    print(platform,"identified",len(uniq),"file names",flush=True)
-    return uniq
-
-def string_c(b):
-    return "\n".join('    "'+"".join(f"\\x{x:02x}" for x in b[i:i+60])+'"' for i in range(0,len(b),60)) or '    ""'
+def list_files(base, suffixes):
+    links = Links()
+    links.feed(fetch(base))
+    base_path = unquote(urlsplit(base).path.rstrip("/"))
+    found = set()
+    for href in links.hrefs:
+        full = urljoin(base, href)
+        url = urlsplit(full)
+        if url.scheme != "https" or url.netloc.lower() != "archive.org":
+            continue
+        path = unquote(url.path)
+        if path.rsplit("/", 1)[0] != base_path:
+            continue
+        name = path.rsplit("/", 1)[-1]
+        if safe_file(name) and name.lower().endswith(suffixes):
+            found.add(name)
+    if len(found) < 10:
+        raise RuntimeError(f"Archive listing yielded only {len(found)} valid files from {base}")
+    return sorted(found, key=str.casefold)
 
 def main():
-    chunks=["/* Autogenerated by archive_catalog_build.py from public Archive listing. */",
-            "typedef struct { const char *platform; const char *prefix; const char *listing; size_t length; } embedded_source_t;"]
-    rows=[]
-    for platform, archive in COLLECTIONS.items():
-        names=raw_listing(platform,archive)
-        # Entries are the individual downloadable files shown in Archive's listing.
-        # This is only a lookup aid and does not assert download availability.
-        listing="\n".join(names)+"\n"
-        chunks.append("static const char source_"+platform+"[] =\n"+string_c(listing.encode("utf-8"))+";")
-        rows.append(f'    {{"{platform}", "{archive}/", source_{platform}, sizeof(source_{platform})-1}},')
-    chunks.append("static const embedded_source_t embedded_sources[] = {")
-    chunks.extend(rows);chunks.append("};")
-    out=Path(__file__).with_name("archive_data.inc")
-    out.write_text("\n".join(chunks)+"\n")
-    print("Archive embedded source index bytes:",out.stat().st_size,flush=True)
-if __name__=="__main__":main()
+    rows = []
+    for platform, (base, suffixes) in SOURCES.items():
+        for name in list_files(base, suffixes):
+            # URLs are generated only from the fixed, selected HTTPS directories.
+            url = base + quote(name, safe="")
+            rows.append(f"    {{{cstr(platform)}, {cstr(name)}, {cstr(url)}}},")
+        print(platform, "indexed", sum(cstr(platform) in x for x in rows), "files", flush=True)
+    source = [
+        "/* GENERATED from the two user-provided archive.org directories. */",
+        "typedef struct { const char *platform; const char *filename; const char *url; } archive_source_t;",
+        "static const archive_source_t archive_sources[] = {",
+        *rows,
+        "};",
+        "static const size_t archive_sources_count =",
+        "    sizeof archive_sources / sizeof archive_sources[0];",
+    ]
+    OUT.write_text("\n".join(source) + "\n", encoding="utf-8")
+    print("Wrote", len(rows), "allowlisted entries to", OUT, flush=True)
+
+if __name__ == "__main__":
+    main()
