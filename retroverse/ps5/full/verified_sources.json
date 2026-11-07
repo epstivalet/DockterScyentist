@@ -1,0 +1,78 @@
+{
+  "schema_version": 1,
+  "description": "Official developer-published homebrew ROM downloads only. Hashes from GitHub release metadata. Do not add commercial game dumps or listings without independently authorized distribution.",
+  "sources": [
+    {
+      "platform": "GENESIS",
+      "title": "Battle 4Tris",
+      "filename": "battle-4tris.bin",
+      "path": "verified/GENESIS/battle-4tris.bin",
+      "url": "https://github.com/monteslu/retro-homebrew-games/releases/download/build-26/battle-4tris.bin",
+      "sha256": "4c41fc7e03f393e3844818283082746624b23ddc121c3dd6c4b9f45eb4c6a8b0",
+      "size": 131072,
+      "provider": "monteslu / GitHub Releases",
+      "license": "MIT",
+      "source_page": "https://github.com/monteslu/retro-homebrew-games/releases/tag/build-26"
+    },
+    {
+      "platform": "GENESIS",
+      "title": "Breakout",
+      "filename": "breakout.bin",
+      "path": "verified/GENESIS/breakout.bin",
+      "url": "https://github.com/monteslu/retro-homebrew-games/releases/download/build-26/breakout.bin",
+      "sha256": "01fc26d512bc5cddfcc2860d15b7ed4ee3637daaf73aa40f1d045967f740abc8",
+      "size": 131072,
+      "provider": "monteslu / GitHub Releases",
+      "license": "MIT",
+      "source_page": "https://github.com/monteslu/retro-homebrew-games/releases/tag/build-26"
+    },
+    {
+      "platform": "GENESIS",
+      "title": "Pong",
+      "filename": "pong.bin",
+      "path": "verified/GENESIS/pong.bin",
+      "url": "https://github.com/monteslu/retro-homebrew-games/releases/download/build-26/pong.bin",
+      "sha256": "4f077c764972b23c6f2ea6056ebc3b8bf1da972d95f400259de676f787f1061d",
+      "size": 131072,
+      "provider": "monteslu / GitHub Releases",
+      "license": "MIT",
+      "source_page": "https://github.com/monteslu/retro-homebrew-games/releases/tag/build-26"
+    },
+    {
+      "platform": "GENESIS",
+      "title": "Snake Arena",
+      "filename": "snake.bin",
+      "path": "verified/GENESIS/snake.bin",
+      "url": "https://github.com/monteslu/retro-homebrew-games/releases/download/build-26/snake.bin",
+      "sha256": "3169306a1396a0cf6c1f4d08f4ed55caa0e5e70627a6e0be689df027b31a5738",
+      "size": 131072,
+      "provider": "monteslu / GitHub Releases",
+      "license": "MIT",
+      "source_page": "https://github.com/monteslu/retro-homebrew-games/releases/tag/build-26"
+    },
+    {
+      "platform": "GENESIS",
+      "title": "Space Shooter",
+      "filename": "space-shooter.bin",
+      "path": "verified/GENESIS/space-shooter.bin",
+      "url": "https://github.com/monteslu/retro-homebrew-games/releases/download/build-26/space-shooter.bin",
+      "sha256": "de2fafcbcb669260ed383e1e8ee48493d5df4ee03b57b01b44cb790fd7339515",
+      "size": 131072,
+      "provider": "monteslu / GitHub Releases",
+      "license": "MIT",
+      "source_page": "https://github.com/monteslu/retro-homebrew-games/releases/tag/build-26"
+    },
+    {
+      "platform": "GENESIS",
+      "title": "Tank Battle",
+      "filename": "tank-battle.bin",
+      "path": "verified/GENESIS/tank-battle.bin",
+      "url": "https://github.com/monteslu/retro-homebrew-games/releases/download/build-26/tank-battle.bin",
+      "sha256": "0cdb580a87c88e6f81248253f8a2a549d41ded5632344c656b8b5ff8e06caff6",
+      "size": 131072,
+      "provider": "monteslu / GitHub Releases",
+      "license": "MIT",
+      "source_page": "https://github.com/monteslu/retro-homebrew-games/releases/tag/build-26"
+    }
+  ]
+}
