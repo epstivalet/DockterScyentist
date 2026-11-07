@@ -304,7 +304,7 @@ function appendHostFile(e){
  open.href=e.source_page;
   open.target='_blank';open.rel='noopener noreferrer';open.textContent='VIEW OFFICIAL RELEASE';
   line.append(info,b,open);root.appendChild(line);
- el('sourceStatus').textContent='This original homebrew game is pinned to the developer's release and checked with SHA-256 after transfer. If the source becomes unavailable, RetroVerse reports the error and leaves no corrupted file.';
+ el('sourceStatus').textContent='This original homebrew game is pinned to the developer release and checked with SHA-256 after transfer. If the source becomes unavailable, RetroVerse reports the error and leaves no corrupted file.';
 }
 async function diag(kind){
  var btn=el(kind==='storage'?'storageCheck':kind==='curl'?'curlCheck':'networkCheck');
