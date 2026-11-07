@@ -709,7 +709,7 @@ static void serve(int sock) {
         if(!strcmp(path,"/api/diagnostics/storage")){diagnostic_storage(sock);return;}
         if(!strcmp(path,"/api/diagnostics/network")){diagnostic_network(sock);return;}
         if(!strcmp(path,"/api/diagnostics/curl")){diagnostic_curl(sock);return;}
-        if(!strcmp(path,"/api/archive/cancel")){job.cancel=1;json(sock,200,"{\"ok\":true}");return;}
+        if(!strcmp(path,"/api/downloads/cancel")){job.cancel=1;json(sock,200,"{\"ok\":true}");return;}
         error(sock,404,"Unsupported endpoint");return;
     }
     error(sock,405,"Only GET and POST methods are supported");
