@@ -113,7 +113,7 @@ nav button{flex:0 0 auto;white-space:nowrap;font-size:12px;padding:10px 12px}
  <label for="torrentMagnet"><strong>MAGNET LINK</strong></label>
  <textarea id="torrentMagnet" spellcheck="false" placeholder="magnet:?xt=urn:btih:..."></textarea>
  <div class="actions"><button class="primary" id="torrentAdd">START TORRENT DOWNLOAD</button><button class="secondary" id="torrentClear">CLEAR</button></div>
- <p class="subtle" id="torrentMessage" aria-live="polite">Only manually provided magnet links are accepted. Downloads may require peers and take time to fetch metadata.</p>
+ <p class="subtle" id="torrentMessage" aria-live="polite">Long magnets are compacted for PS5Torrent 2.0.4. You will be warned if trackers or other fields must be omitted.</p>
  </div>
  <div class="row"><h2>TORRENT QUEUE</h2><span class="subtle">Refresh to update peers and transfer speed</span></div>
  <div class="pane" id="torrentJobs">No torrent data yet.</div>
@@ -423,20 +423,66 @@ async function loadTorrents(){
   });
  }catch(e){panel.textContent='Torrent queue unavailable: '+e.message;}
 }
+/* PS5Torrent v2.0.4 has a 1024-byte magnet storage field and a 2048-byte
+ * URL-decoded API field. Preserve whole parameters, never slice a tracker URL. */
+function prepareMagnet(raw){
+ raw=raw.trim();
+ if(!/^magnet:\?/i.test(raw))throw Error('Paste a magnet:? link.');
+ if(raw.length>100000)throw Error('Magnet link exceeds the safe input limit.');
+ var params=new URLSearchParams(raw.slice(raw.indexOf('?')+1));
+ var entries=[],seen={};
+ params.forEach(function(v,k){
+  k=k.toLowerCase();
+  var sig=k+'\u0000'+v;
+  if(seen[sig])return;
+  seen[sig]=true;entries.push({key:k,value:v});
+ });
+ var hashes=entries.filter(function(p){
+  return p.key==='xt'&&(/^urn:btih:(?:[A-Fa-f0-9]{40}|[A-Za-z2-7]{32})$/.test(p.value)||
+         /^urn:btmh:1220[A-Fa-f0-9]{64}$/.test(p.value));
+ });
+ if(!hashes.length)throw Error('No valid btih/btmh torrent hash found.');
+ function part(k,v){return k+'='+encodeURIComponent(v).replace(/%3A/gi,':').replace(/%2F/gi,'/').replace(/%40/gi,'@');}
+ function fits(s){return s.length<=950&&encodeURIComponent(s).length<=1850;}
+ var fields=[],selected=[],skipped=[];
+ function push(p){
+  var next='magnet:?'+fields.concat(part(p.key,p.value)).join('&');
+  if(!fits(next))return false;
+  fields.push(part(p.key,p.value));selected.push(p);return true;
+ }
+ hashes.forEach(function(p){
+  if(!push(p))throw Error('Torrent hash is too long for PS5Torrent.');
+ });
+ var ordered=entries.filter(function(p){return p.key==='so'||p.key==='x.pe';})
+  .concat(entries.filter(function(p){return p.key==='tr';}))
+  .concat(entries.filter(function(p){return p.key!=='xt'&&p.key!=='so'&&p.key!=='x.pe'&&p.key!=='tr';}));
+ ordered.forEach(function(p){if(!push(p))skipped.push(p);});
+ entries.filter(function(p){return p.key==='xt'&&hashes.indexOf(p)<0;})
+  .forEach(function(p){skipped.push(p);});
+ var trackers=entries.filter(function(p){return p.key==='tr';}).length;
+ var kept=selected.filter(function(p){return p.key==='tr';}).length;
+ return {magnet:'magnet:?'+fields.join('&'),skipped:skipped.length,trackers:trackers,
+         kept:kept,other:skipped.filter(function(p){return p.key!=='tr';}).length};
+}
 async function addMagnet(){
  if(torrentWorking)return;
- var magnet=el('torrentMagnet').value.trim();
- if(!magnet.startsWith('magnet:?')||!(/xt=urn:btih:|xt=urn:btmh:/i).test(magnet)){
-  el('torrentMessage').textContent='Paste a valid magnet URI with a BitTorrent info hash.';return;
+ var prepared;
+ try{prepared=prepareMagnet(el('torrentMagnet').value);}
+ catch(e){el('torrentMessage').textContent=e.message;return;}
+ var message='Start this torrent on the PS5? Confirm you have permission to download and share the files with peers.';
+ if(prepared.skipped){
+  message+='\n\nYour long link was shortened for PS5Torrent 2.0.4. Kept '+prepared.kept+
+   ' of '+prepared.trackers+' unique trackers and omitted '+prepared.other+' other fields.';
+  message+='\n\nOmitted trackers may reduce availability. Use the PS5Torrent web panel directly if every tracker is needed.';
  }
- if(magnet.length>1800){el('torrentMessage').textContent='Magnet URI is too long (maximum 1800 characters).';return;}
- if(!confirm('Start this torrent on your PS5? Confirm you have permission to download and share its files with other peers.'))return;
+ if(!confirm(message))return;
+ var magnet=prepared.magnet;
  torrentWorking=true;el('torrentAdd').disabled=true;
  el('torrentMessage').textContent='Submitting magnet to the local PS5Torrent service…';
  try{
   var r=await get('/api/torrent/add',{method:'POST',headers:{'Content-Type':'application/json'},
    body:JSON.stringify({magnet:magnet,rights_confirmed:true})});
-  el('torrentMessage').textContent='Added: '+(r.name||'Torrent')+'. File retrieval depends on available peers.';
+  el('torrentMessage').textContent='Added: '+(r.name||'Torrent')+'. '+(prepared.skipped?'Compact magnet used ('+prepared.kept+'/'+prepared.trackers+' trackers). ':'')+'Download depends on peers.';
   el('torrentMagnet').value='';
   loadTorrents();
  }catch(e){el('torrentMessage').textContent='Could not start torrent: '+e.message}
