@@ -405,6 +405,132 @@ static void *download_thread(void *arg){
     job.total=job.received;
     job.state=J_COMPLETED;return NULL;
 }
+/* One user-initiated Archive transfer at a time. For PS1 discs a request
+ * downloads every BIN track and CUE in its matching basename group, to avoid
+ * silently producing a CUE without its companion tracks. */
+static void *archive_download_thread(void *arg){
+    (void)arg;
+    const archive_source_t *selected=find_archive_source(job.platform,job.path);
+    if(!selected){snprintf(job.error,sizeof job.error,"Archive file not found in embedded index");job.state=J_FAILED;return NULL;}
+    if(directories(job.platform)<0){
+        snprintf(job.error,sizeof job.error,"Cannot create PS5 library: %s",strerror(errno));
+        job.state=J_FAILED;return NULL;
+    }
+    const archive_source_t *items[64];size_t count=0;
+    int is_ps1=!strcmp(job.platform,"PS1");
+    if(is_ps1){
+        /* BIN tracks before CUE, making completed CUE files usable immediately. */
+        for(int pass=0;pass<2;pass++){
+            for(size_t i=0;i<archive_sources_count;i++){
+                const archive_source_t *row=&archive_sources[i];
+                if(strcmp(row->platform,"PS1")||strcmp(row->group,selected->group))continue;
+                int is_cue=endswith(row->filename,".cue");
+                if(is_cue != (pass==1))continue;
+                if(count==sizeof(items)/sizeof(items[0])){
+                    snprintf(job.error,sizeof job.error,"Too many tracks in one disc group");
+                    job.state=J_FAILED;return NULL;
+                }
+                items[count++]=row;
+            }
+        }
+    }else items[count++]=selected;
+    if(!count){job.state=J_FAILED;snprintf(job.error,sizeof job.error,"No files in selected disc group");return NULL;}
+    char dest[680],part[680],last[340]={0};
+    for(size_t i=0;i<count;i++){
+        const archive_source_t *src=items[i];
+        if(job.cancel){job.state=J_CANCELED;return NULL;}
+        if(!safe_name(src->filename)||!src->size||src->size>DOWNLOAD_MAX){
+            snprintf(job.error,sizeof job.error,"Unsafe archive filename or file size");
+            job.state=J_FAILED;return NULL;
+        }
+        snprintf(dest,sizeof dest,"%s/%s/%s",ROM_DIR,job.platform,src->filename);
+        struct stat st;
+        if(stat(dest,&st)==0){
+            if(st.st_size<0||(unsigned long long)st.st_size!=src->size||
+               archive_file_digest(dest,src)!=0){
+                snprintf(job.error,sizeof job.error,"Existing file differs; refusing to overwrite");
+                job.state=J_FAILED;return NULL;
+            }
+            /* Existing matching file belongs to the user and remains untouched. */
+            snprintf(last,sizeof last,"roms/%s/%s",job.platform,src->filename);
+            continue;
+        }
+        if(errno!=ENOENT){
+            snprintf(job.error,sizeof job.error,"Cannot inspect destination: %s",strerror(errno));
+            job.state=J_FAILED;return NULL;
+        }
+        snprintf(part,sizeof part,"%s/%s/.retroverse-%u-%u.part",ROM_DIR,job.platform,
+                 job.id,(unsigned)i);
+        int fd=open(part,O_WRONLY|O_CREAT|O_EXCL,0600);
+        if(fd<0){
+            snprintf(job.error,sizeof job.error,"Cannot create temporary file: %s",strerror(errno));
+            job.state=J_FAILED;return NULL;
+        }
+        FILE *out=fdopen(fd,"wb");
+        if(!out){int saved=errno;close(fd);unlink(part);
+            snprintf(job.error,sizeof job.error,"Cannot open output: %s",strerror(saved));
+            job.state=J_FAILED;return NULL;
+        }
+        snprintf(job.filename,sizeof job.filename,"%s",src->filename);
+        job.received=0;job.total=src->size;
+        int err=rv_https_download(src->url,out,src->size,&job.cancel,&job.received,
+                                  &job.total,job.error,sizeof job.error);
+        if(fclose(out)!=0&&!err){
+            err=-1;snprintf(job.error,sizeof job.error,"File flush failed: %s",strerror(errno));
+        }
+        if(job.cancel){unlink(part);job.state=J_CANCELED;return NULL;}
+        if(!err&&job.received!=src->size){
+            err=-1;snprintf(job.error,sizeof job.error,
+                "Unexpected file size: %llu of %llu bytes",
+                (unsigned long long)job.received,src->size);
+        }
+        if(!err){
+            int verified=archive_file_digest(part,src);
+            if(verified!=0){
+                err=-1;snprintf(job.error,sizeof job.error,
+                   verified>0?"Archive checksum mismatch":"Could not read file for checksum");
+            }
+        }
+        if(!err && link(part,dest)<0){
+            err=-1;snprintf(job.error,sizeof job.error,
+               "Cannot finalize file without overwrite: %s",strerror(errno));
+        }
+        unlink(part);
+        if(err){job.state=J_FAILED;return NULL;}
+        snprintf(last,sizeof last,"roms/%s/%s",job.platform,src->filename);
+    }
+    snprintf(job.saved,sizeof job.saved,"%s",last);
+    job.state=J_COMPLETED;
+    return NULL;
+}
+static void start_archive_download(int sock,const char *body){
+    char platform[24],identifier[180];platform[0]=identifier[0]=0;
+    if(!json_bool(body,"rights_confirmed")||
+       !json_str(body,"platform",platform,sizeof platform)||
+       !json_str(body,"filename",identifier,sizeof identifier)){
+        error(sock,400,"Selected archive file and permission confirmation are required");return;
+    }
+    const archive_source_t *src=find_archive_source(platform,identifier);
+    if(!src||!safe_name(src->filename)){error(sock,400,"Archive file is not indexed");return;}
+    pthread_mutex_lock(&lock);
+    if(job.state==J_DOWNLOADING){pthread_mutex_unlock(&lock);error(sock,409,"A download is already active");return;}
+    memset(&job,0,sizeof job);
+    job.id=++sequence;job.state=J_DOWNLOADING;
+    snprintf(job.platform,sizeof job.platform,"%s",platform);
+    snprintf(job.path,sizeof job.path,"%s",identifier);
+    snprintf(job.filename,sizeof job.filename,"%s",src->filename);
+    job.total=src->size;
+    pthread_t worker;
+    if(pthread_create(&worker,NULL,archive_download_thread,NULL)){
+        job.state=J_FAILED;pthread_mutex_unlock(&lock);error(sock,500,"Could not start archive transfer");return;
+    }
+    pthread_detach(worker);
+    pthread_mutex_unlock(&lock);
+    char answer[130];snprintf(answer,sizeof answer,
+        "{\"ok\":true,\"id\":\"%u\",\"status\":\"downloading\"}",job.id);
+    json(sock,200,answer);
+}
+
 static void jobs_response(int sock){
     char body[2000],name[500],e[500],saved[750];int state=job.state;
     json_quote(job.filename,name,sizeof name);json_quote(job.error,e,sizeof e);json_quote(job.saved,saved,sizeof saved);
@@ -857,6 +983,7 @@ static void serve(int sock) {
         while(have<len){ssize_t n=recv(sock,data+have,(size_t)len-have,0);if(n<=0){error(sock,400,"Incomplete request");return;}have+=(size_t)n;}
         data[have]=0;
         if(!strcmp(path,"/api/curated/download")){start_download(sock,data);return;}
+        if(!strcmp(path,"/api/archive/download")){start_archive_download(sock,data);return;}
         if(!strcmp(path,"/api/torrent/add")){torrent_request(sock,"add","POST",data);return;}
         if(!strcmp(path,"/api/torrent/action")){torrent_request(sock,"action","POST",data);return;}
         if(!strcmp(path,"/api/test-download")){test_download(sock);return;}
