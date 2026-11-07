@@ -78,17 +78,17 @@ constexpr Color teal=static_cast<Color>(UINT32_C(0xffdbe890));
 constexpr Color gold=static_cast<Color>(UINT32_C(0xff79dcff));
 struct Console {const char *id,*name;Color accent;const char *prefix;};
 const Console consoles[]={
- {"SNES","SUPER NINTENDO",purple,"Nintendo - SNES.zip/"},
- {"NES","NINTENDO",gold,"Nintendo - NES.zip/"},
- {"GENESIS","SEGA GENESIS",teal,"Sega - Genesis.zip/"},
- {"GB","GAME BOY",teal,"Nintendo - Game Boy.zip/"},
- {"GBA","GAME BOY ADVANCE",purple,"Nintendo - Game Boy Advance.zip/"},
- {"N64","NINTENDO 64",gold,"Nintendo - N64.zip/"},
- {"GC","GAMECUBE",purple,"Game cube/"},
- {"PS1","PLAYSTATION",teal,"Sony - PS1/"},
+ {"SNES","SUPER NINTENDO",purple,nullptr},
+ {"NES","NINTENDO",gold,nullptr},
+ {"GENESIS","SEGA GENESIS",teal,"verified/GENESIS/"},
+ {"GB","GAME BOY",teal,nullptr},
+ {"GBA","GAME BOY ADVANCE",purple,nullptr},
+ {"N64","NINTENDO 64",gold,nullptr},
+ {"GC","GAMECUBE",purple,nullptr},
+ {"PS1","PLAYSTATION",teal,nullptr},
  {"PS2","PLAYSTATION 2",gold,nullptr},
- {"DC","DREAMCAST",purple,"Sega - Dreamcast.zip/"},
- {"ARCADE","ARCADE",gold,"Arcade - Mame 2003 Plus.zip/"}
+ {"DC","DREAMCAST",purple,nullptr},
+ {"ARCADE","ARCADE",gold,nullptr}
 };
 constexpr int systems=int(sizeof(consoles)/sizeof(consoles[0]));
 constexpr int maxgames=8000;
@@ -353,7 +353,7 @@ static void load_source(){
  Game*g=selected();if(!g)return;
  if(tab==1){
   std::snprintf(selected_source,sizeof selected_source,"%s",g->source);
-  std::snprintf(status,sizeof status,selected_source[0]?"HOST FILE LISTED / X TO REQUEST DOWNLOAD":"NO CURATED FILE FOR THIS SYSTEM");
+  std::snprintf(status,sizeof status,selected_source[0]?"HOST FILE LISTED / X TO REQUEST DOWNLOAD":"NO VERIFIED FILE FOR THIS SYSTEM");
   return;
  }
  if(tab!=0)return;
@@ -372,7 +372,7 @@ static void load_source(){
  }
  free_resp(r);
  std::snprintf(status,sizeof status,
-   selected_source[0]?"SOURCE FOUND / PRESS X TO CONFIRM RIGHTS AND DOWNLOAD":"NO CURATED FILE MATCHES THIS GAME");
+   selected_source[0]?"OFFICIAL RELEASE FOUND / PRESS X TO DOWNLOAD":"NO VERIFIED FILE MATCHES THIS GAME");
 }
 static void start_download(){
  Game*g=selected();if(!g||!selected_source[0])return;
@@ -527,7 +527,7 @@ static void draw(Canvas&c) noexcept {
   Game*g=selected();
   c.text(166,520,"GAME DETAILS",7,sys.accent);
   if(g)c.text(166,608,g->title,6,white);
-  c.text(166,710,selected_source[0]?"FILE LISTED IN CURATED ARCHIVE":"NO DIRECT FILE AVAILABLE",4,white);
+  c.text(166,710,selected_source[0]?"FILE LISTED IN OFFICIAL HOMEBREW":"NO DIRECT FILE AVAILABLE",4,white);
   c.text(166,796,selected_source[0]?"X CONFIRMS YOU HAVE RIGHTS AND STARTS PS5 DOWNLOAD":"O RETURNS TO BROWSING",4,teal);
   c.text(166,857,"ONLY DOWNLOAD CONTENT YOU ARE AUTHORIZED TO USE",3,muted);
  }
