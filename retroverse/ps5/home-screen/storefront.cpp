@@ -97,7 +97,7 @@ static Game *games=nullptr;
 static int ngames=0,system_index=0,tab=0,letter='A',highlight=0;
 static bool dialog=false,helper=false,already_autostarted=false,loading_art=false,cover_attempted=false;
 static int pad=-1;
-static char status[600]="RETROVERSE NATIVE STORE LOADING";
+static char status[600]="RETROVERSE v0.9 NATIVE STORE LOADING";
 static char transfer[520]="NO TRANSFER ACTIVE";
 static char selected_source[700]="";
 static unsigned last_buttons=0;
@@ -255,7 +255,8 @@ static Response http(const char*method,const char*path,const char*payload,size_t
 static void free_resp(Response&r){std::free(r.data);r.data=nullptr;}
 static bool helper_status(){
  Response r=http("GET","/api/health",nullptr,2048);
- bool ok=r.http==200&&r.data&&std::strstr((char*)r.data,"\"ok\":true");
+ bool ok=r.http==200&&r.data&&std::strstr((char*)r.data,"\"ok\":true")&&
+          std::strstr((char*)r.data,"\"sha256_downloads\"");
  free_resp(r);return ok;
 }
 static bool launch_helper(){
@@ -289,8 +290,8 @@ static bool launch_helper(){
 }
 static void refresh_helper(){
  helper=helper_status();
- if(helper)std::snprintf(status,sizeof status,"RETROVERSE DOWNLOADER CONNECTED");
- else std::snprintf(status,sizeof status,"HELPER OFFLINE / START PAYLOAD ON PORT 9021 / OPTIONS RETRIES");
+ if(helper)std::snprintf(status,sizeof status,"RETROVERSE VERIFIED DOWNLOADER CONNECTED");
+ else std::snprintf(status,sizeof status,"HELPER MISSING OR OUTDATED / RESTART NEW ELF VIA PORT 9021");
 }
 static void load_library(){
  ngames=0;highlight=0;dialog=false;
@@ -345,7 +346,7 @@ static void refresh_jobs(){
                   state,have,max);
    }
   }else std::snprintf(transfer,sizeof transfer,"NO ACTIVE TRANSFER");
- }else std::snprintf(transfer,sizeof transfer,"DOWNLOADER OFFLINE");
+ }else std::snprintf(transfer,sizeof transfer,"VERIFIED DOWNLOADER OFFLINE");
  free_resp(r);
 }
 static void load_source(){
@@ -585,5 +586,5 @@ extern "C" bool retroverse_process_input(){
 int main(){
  // Reaching this notification confirms executable linking and startup worked.
  notify("RetroVerse v0.8.2 booted / initializing native TV");
- ps5::demo::run(draw,"RetroVerse v0.8.2 native storefront displaying");
+ ps5::demo::run(draw,"RetroVerse v0.9 native storefront displaying");
 }
