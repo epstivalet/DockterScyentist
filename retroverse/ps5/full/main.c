@@ -24,8 +24,10 @@
 #include "assets.inc"
 #include "catalog_data.inc"
 #include "verified_sources.inc"
+#include "archive_sources.inc"
 #include "archive_data.inc"
 #include <openssl/sha.h>
+#include <openssl/evp.h>
 #include "curl_net.h"
 #include "torrent_bridge.h"
 
@@ -187,6 +189,41 @@ static void archive_title(const char *filename,char *title,size_t n){
     snprintf(title,n,"%s",filename);
     char *dot=strrchr(title,'.');
     if(dot)*dot=0;
+}
+
+/* Archive files are indexed at build time from the two configured item
+ * metadata APIs. Only IDs from that embedded index can be downloaded. */
+static const archive_source_t *find_archive_source(const char *platform,const char *path){
+    for(size_t i=0;i<archive_sources_count;i++){
+        const archive_source_t *src=&archive_sources[i];
+        if(!strcmp(src->platform,platform)&&!strcmp(src->path,path))return src;
+    }
+    return NULL;
+}
+static int archive_file_digest(const char *file,const archive_source_t *src) {
+    const char *expected=src->sha1[0]?src->sha1:src->md5;
+    const EVP_MD *algorithm=src->sha1[0]?EVP_sha1():src->md5[0]?EVP_md5():NULL;
+    if(!algorithm)return 0; /* Only size can be checked when no hash exists. */
+    EVP_MD_CTX *ctx=EVP_MD_CTX_new();
+    if(!ctx)return -1;
+    if(EVP_DigestInit_ex(ctx,algorithm,NULL)!=1){EVP_MD_CTX_free(ctx);return -1;}
+    FILE *in=fopen(file,"rb");
+    if(!in){EVP_MD_CTX_free(ctx);return -1;}
+    unsigned char bytes[65536],digest[EVP_MAX_MD_SIZE];unsigned len=0;
+    size_t n;int ok=1;
+    while((n=fread(bytes,1,sizeof bytes,in))!=0){
+        if(EVP_DigestUpdate(ctx,bytes,n)!=1){ok=0;break;}
+    }
+    if(ferror(in))ok=0;
+    fclose(in);
+    if(ok&&EVP_DigestFinal_ex(ctx,digest,&len)!=1)ok=0;
+    EVP_MD_CTX_free(ctx);
+    if(!ok)return -1;
+    static const char hex[]="0123456789abcdef";
+    char actual[EVP_MAX_MD_SIZE*2+1];
+    for(unsigned i=0;i<len;i++){actual[2*i]=hex[digest[i]>>4];actual[2*i+1]=hex[digest[i]&15];}
+    actual[len*2]=0;
+    return strcmp(actual,expected)==0?0:1;
 }
 
 static int digest_matches(const unsigned char digest[SHA256_DIGEST_LENGTH],const char *expected){
