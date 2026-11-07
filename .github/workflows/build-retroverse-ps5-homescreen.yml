@@ -1,4 +1,4 @@
-name: Build RetroVerse PS5 Installable Native Store v0.10
+name: Build RetroVerse PS5 Installable Native Store v0.10.1
 on:
   workflow_dispatch:
   push:
@@ -67,7 +67,7 @@ jobs:
           from pathlib import Path
           path=Path("sce_sys/param.json")
           p=json.loads(path.read_text())
-          p["contentVersion"]="01.001.000"
+          p["contentVersion"]="01.001.001"
           path.write_text(json.dumps(p,indent=2)+"\n")
           PY
           /usr/bin/python3 "$GITHUB_WORKSPACE/retroverse/ps5/home-screen/generate_icon.py" sce_sys/icon0.png
@@ -85,6 +85,8 @@ jobs:
         run: |
           make app
           test -s dist/PPSA99873/eboot.bin
+          # Inspect built ELF's import names as a startup compatibility diagnostic.
+          file dist/PPSA99873/eboot.bin
           test -s dist/PPSA99873/sce_module/libc.prx
           test -s dist/PPSA99873/sce_sys/icon0.png
           test -s dist/PPSA99873/assets/retroverse-helper.elf
@@ -108,26 +110,47 @@ jobs:
           cd /tmp/rv-native-template/dist
           python3 - <<'PY'
           from pathlib import Path
-          import zipfile
+          import zipfile, stat, os
           app=Path('PPSA99873')
-          out=Path('RetroVerse-PS5-v0.10-Native-Store.zip')
-          with zipfile.ZipFile(out,'w',compression=zipfile.ZIP_DEFLATED,compresslevel=8) as f:
-              for p in sorted(app.rglob('*')):
-                  if p.is_file():f.write(p,p.as_posix())
+          out=Path('RetroVerse-PS5-v0.10.1-Native-Store.zip')
+          # PS5 ShadowMountPlus titles can fail to start with CE-107750-0
+          # when eboot.bin (or its runtime) is unpacked as non-executable.
+          # Explicitly encode 0777 Unix permissions on every ZIP member.
+          # Preserve directory entries as well as file entries.
+          with zipfile.ZipFile(out,'w',compression=zipfile.ZIP_DEFLATED,compresslevel=8) as z:
+              for p in [app] + sorted(app.rglob('*')):
+                  is_dir=p.is_dir()
+                  name=p.as_posix()+('/' if is_dir else '')
+                  info=zipfile.ZipInfo(name)
+                  info.create_system=3
+                  info.external_attr=((stat.S_IFDIR if is_dir else stat.S_IFREG)|0o777)<<16
+                  info.compress_type=zipfile.ZIP_DEFLATED
+                  if is_dir:
+                      z.writestr(info,b'')
+                  else:
+                      with p.open('rb') as file:z.writestr(info,file.read())
           with zipfile.ZipFile(out) as f:
               assert f.testzip() is None
+              for info in f.infolist():
+                  mode=info.external_attr >> 16
+                  assert (mode & 0o777)==0o777, f'Bad ZIP permissions: {info.filename}: {oct(mode)}'
+                  assert info.create_system==3, f'Missing Unix mode metadata: {info.filename}'
+              for needed_exec in ('PPSA99873/eboot.bin','PPSA99873/sce_module/libc.prx'):
+                  mode=f.getinfo(needed_exec).external_attr >> 16
+                  assert stat.S_ISREG(mode) and (mode & 0o111)==0o111
+              print('PASS: all PS5 app ZIP files and folders explicitly carry 0777 permissions')
               needed={'PPSA99873/eboot.bin','PPSA99873/sce_sys/icon0.png',
                       'PPSA99873/sce_sys/param.json','PPSA99873/sce_module/libc.prx',
                       'PPSA99873/assets/retroverse-helper.elf','PPSA99873/assets/catalog/GC.txt'}
               assert needed <= set(f.namelist())
           print(out, out.stat().st_size)
           PY
-          sha256sum RetroVerse-PS5-v0.10-Native-Store.zip > SHA256SUMS
+          sha256sum RetroVerse-PS5-v0.10.1-Native-Store.zip > SHA256SUMS
       - name: Upload installable RetroVerse native storefront
         uses: actions/upload-artifact@v4
         with:
-          name: RetroVerse-PS5-v0.10-Native-Store
+          name: RetroVerse-PS5-v0.10.1-Native-Store
           path: |
-            /tmp/rv-native-template/dist/RetroVerse-PS5-v0.10-Native-Store.zip
+            /tmp/rv-native-template/dist/RetroVerse-PS5-v0.10.1-Native-Store.zip
             /tmp/rv-native-template/dist/SHA256SUMS
           if-no-files-found: error
