@@ -81,10 +81,10 @@ nav button{flex:0 0 auto;white-space:nowrap;font-size:12px;padding:10px 12px}
 </section>
 
 <section id="hosts" class="hidden">
- <div class="row"><h2>AVAILABLE BY HOST</h2><span class="pill">Listed files only · delivery not yet verified</span></div>
- <p class="subtle">This tab shows games with individual filenames in an indexed source. The artwork catalog alone does not make a game downloadable. Vimm's Lair is listed as external browsing only until a supported file index is available.</p>
+ <div class="row"><h2>AVAILABLE BY HOST</h2><span class="pill">Official homebrew · SHA-256 checked</span></div>
+ <p class="subtle">This tab lists original homebrew games from their developers' official GitHub releases, with pinned file sizes and SHA-256 checksums. The larger artwork catalog is for browsing only. External sites are not treated as verified downloads.</p>
  <div class="actions">
- <select id="hostSelector" aria-label="Select game source"><option value="archive">Internet Archive · Curated Collection</option><option value="vimm">Vimm's Lair · External only</option></select>
+ <select id="hostSelector" aria-label="Select game source"><option value="verified">Official Developer Releases</option><option value="vimm">Vimm's Lair · External only</option></select>
  <select id="hostPlatform" aria-label="Select console"></select>
  <button class="secondary" id="hostRefresh">REFRESH FILE LIST</button>
  </div>
@@ -96,17 +96,17 @@ nav button{flex:0 0 auto;white-space:nowrap;font-size:12px;padding:10px 12px}
 <section id="library" class="hidden"><h2>MY PS5 LIBRARY</h2><p class="subtle">Files imported or downloaded to /data/retroverse/roms/ on your PS5. No system files are modified.</p>
 <div class="actions"><button class="primary" id="refreshLibrary">REFRESH</button><select id="uploadPlatform"></select><input type="file" id="uploadFile" aria-label="Choose authorized game file"><button class="secondary" id="uploadButton">UPLOAD FROM PC / PHONE</button></div>
 <p class="subtle" id="uploadState"></p><div class="pane" id="libraryList">Loading…</div></section>
-<section id="downloads" class="hidden"><h2>DOWNLOAD MANAGER</h2><p class="subtle">Downloads are written directly by the PS5 payload to its RetroVerse library. Only download content you are authorized to use.</p><div class="actions"><button class="primary" id="storageCheck">1. TEST PS5 STORAGE</button><button class="primary" id="networkCheck">3. TEST NATIVE HTTPS</button><button class="primary" id="curlCheck">2. TEST SECURE CURL</button><button class="secondary" id="testDownload">4. FULL FILE TEST</button><button class="secondary" id="refreshJobs">REFRESH STATUS</button></div><p class="subtle">These checks isolate local storage, the new verified-certificate HTTPS transport, and the original PS5 HTTPS client. Test 4 downloads a small public XML metadata file, verifies it on PS5 storage, and deletes it. No game files are downloaded.</p><div class="pane" id="diagnosticResults" style="white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word">Run storage and HTTPS tests first.</div><p class="subtle" id="testResult"></p><div class="pane" id="jobs">No downloads yet.</div></section>
+<section id="downloads" class="hidden"><h2>DOWNLOAD MANAGER</h2><p class="subtle">Downloads are written directly by the PS5 payload to its RetroVerse library. Only download content you are authorized to use.</p><div class="actions"><button class="primary" id="storageCheck">1. TEST PS5 STORAGE</button><button class="primary" id="networkCheck">3. TEST NATIVE HTTPS</button><button class="primary" id="curlCheck">2. TEST SECURE CURL</button><button class="secondary" id="testDownload">4. FULL FILE TEST</button><button class="secondary" id="refreshJobs">REFRESH STATUS</button></div><p class="subtle">These checks isolate local storage, the new verified-certificate HTTPS transport, and the original PS5 HTTPS client. Test 4 downloads a small original, freely distributed homebrew ROM from its developer, checks its SHA-256 on the PS5, and deletes the test file.</p><div class="pane" id="diagnosticResults" style="white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word">Run storage and HTTPS tests first.</div><p class="subtle" id="testResult"></p><div class="pane" id="jobs">No downloads yet.</div></section>
 </main>
 <dialog id="detailDialog" class="modal"><button class="secondary" id="closeDetail" style="float:right">✕ CLOSE</button>
 <div class="detail"><div><img id="detailArt" alt="Game cover"><img id="detailShot" alt="Game screenshot" style="margin-top:14px"></div>
 <div><span class="kicker" id="detailPlatform"></span><h2 id="detailTitle" style="margin:10px 0 12px;font-size:32px"></h2>
 <p class="subtle">Cover and screenshot data: Libretro Thumbnails. Catalog entries do not imply a download is offered or legally distributable.</p>
-<button class="primary" id="findDownload">CHECK CURATED ARCHIVE</button><p id="sourceStatus" class="subtle"></p><div id="sourceMatches"></div>
+<button class="primary" id="findDownload">CHECK OFFICIAL SOURCES</button><p id="sourceStatus" class="subtle"></p><div id="sourceMatches"></div>
 <div class="source"><span>Add an authorized copy you already have</span><button id="importThis">UPLOAD FILE</button></div>
 <div class="source"><span>Open Vimm's Lair manually (external site)</span><button id="openVimm">OPEN</button></div>
 </div></div></dialog>
-<footer>RetroVerse PS5 Alpha · CoinOPS visual theme assets © respective contributors, CC BY-NC-SA 2.0 · <a href="https://github.com/nazdir/coinops-modified" target="_blank" rel="noopener">Theme credits</a> · Libretro thumbnails © respective rightsholders · Homebrew test, not a commercial store</footer>
+<footer>RetroVerse PS5 v0.9 · CoinOPS visual theme assets © respective contributors, CC BY-NC-SA 2.0 · <a href="https://github.com/nazdir/coinops-modified" target="_blank" rel="noopener">Theme credits</a> · Libretro thumbnails © respective rightsholders · Homebrew test, not a commercial store</footer>
 <script>
 'use strict';
 var SYSTEMS=[
@@ -198,17 +198,17 @@ function showDetails(g){
  var selectedSystem=SYSTEMS.find(function(x){return x[0]===g.platform})||sys();
  el('detailPlatform').textContent=selectedSystem[1]+' · '+(g.region||'REGION UNSPECIFIED');
  el('detailArt').src=getArt(g,'Named_Boxarts');el('detailShot').src=getArt(g,'Named_Snaps');
- el('sourceStatus').textContent='Choose a source. Direct Archive availability is checked on demand.';
+ el('sourceStatus').textContent='Only approved developer releases are downloadable here; the artwork catalog does not guarantee a game download.';
  el('sourceMatches').replaceChildren();el('detailDialog').showModal();
 }
 async function findSources(){
  var g=current;if(!g)return;
- el('sourceStatus').textContent='Checking the selected Archive collection for '+g.title+'…';
+ el('sourceStatus').textContent='Checking approved developer releases for '+g.title+'…';
  el('sourceMatches').replaceChildren();
  try{
   var res=await get('/api/curated/matches?platform='+enc(g.platform)+'&title='+enc(g.title));
   if(current!==g)return;
-  el('sourceStatus').textContent=res.supported?(res.files.length+' matched source files. Only download games you are authorized to use.'):'No curated collection configured for this console.';
+  el('sourceStatus').textContent=res.supported?(res.files.length+' verified original homebrew releases found.'):'No verified sources are configured for this console.';
   res.files.forEach(function(f){
    var line=document.createElement('div');line.className='source';var desc=document.createElement('span');desc.textContent=f.display_name;
    var b=document.createElement('button');b.textContent='DOWNLOAD ↓';b.onclick=async function(){
@@ -253,20 +253,20 @@ function hostGameTitle(f){return String(f.title||'').trim()}
 async function loadHostGames(){
  var source=el('hostSelector').value,p=el('hostPlatform').value,token=++hostLoadToken;
  el('hostCards').replaceChildren();
- el('hostHeading').textContent=source==='archive'?'Internet Archive · '+p+' · '+hostLetter:'Vimm’s Lair';
- if(source!=='archive'){
+ el('hostHeading').textContent=source==='verified'?'Official Homebrew · '+p+' · '+hostLetter:'Vimm’s Lair';
+ if(source!=='verified'){
   hostEntries=[];el('hostInfo').textContent='Vimm’s Lair has not provided a verified public direct-file index. Its game pages can be browsed externally, but no downloads are claimed.';
   var a=document.createElement('a');a.href='https://vimm.net/vault';a.target='_blank';a.rel='noopener noreferrer';a.textContent='Open Vimm’s Vault';
   el('hostCards').appendChild(a);return;
  }
- el('hostInfo').textContent='Loading indexed filenames for '+p+'…';
+ el('hostInfo').textContent='Loading approved homebrew releases for '+p+'…';
  try{
-  var data=await get('/api/host-games?host=archive&platform='+enc(p)+'&letter='+enc(hostLetter));
+  var data=await get('/api/host-games?host=verified&platform='+enc(p)+'&letter='+enc(hostLetter));
   if(token!==hostLoadToken)return;
   hostEntries=data.games||[];
   el('hostInfo').textContent=data.indexed?
-    hostEntries.length+' filenames found for '+p+' under '+hostLetter+'. Files are listed, but remote delivery must still be tested.':
-    'No indexed files for this console in the configured collection.';
+    hostEntries.length+' pinned developer releases for '+p+' under '+hostLetter+'. Downloaded bytes will be verified on the PS5.':
+    'No approved direct downloads for this console. You can still import your own files in MY LIBRARY.';
   renderHostCards();
  }catch(e){if(token===hostLoadToken)el('hostInfo').textContent='Host index error: '+e.message}
 }
@@ -281,7 +281,7 @@ function renderHostCards(){
   var img=document.createElement('img');img.loading='lazy';img.alt='Artwork for '+e.title;img.src=getArt(g,'Named_Boxarts');
   img.onerror=function(){img.onerror=null;img.style.visibility='hidden'};
   var label=document.createElement('strong');label.textContent=e.title;
-  var small=document.createElement('small');small.textContent='FILE LISTED · OPEN';
+  var small=document.createElement('small');small.textContent='OFFICIAL RELEASE · OPEN';
   b.append(img,label,small);b.onclick=function(){showDetails(g);appendHostFile(e)};
   root.appendChild(b);
  });
@@ -289,10 +289,10 @@ function renderHostCards(){
 function appendHostFile(e){
  var root=el('sourceMatches');root.replaceChildren();
  var line=document.createElement('div');line.className='source';
- var info=document.createElement('span');info.textContent='Internet Archive listed: '+e.filename;
- var b=document.createElement('button');b.textContent='TRY PS5 DOWNLOAD';
+ var info=document.createElement('span');info.textContent='Developer release: '+e.title+' · '+(e.size||0)+' bytes · SHA-256 verified';
+ var b=document.createElement('button');b.textContent='DOWNLOAD TO PS5';
  b.onclick=async function(){
-  if(!confirm('Try downloading '+e.title+' directly onto the PS5? Only proceed if you have permission to use this file.'))return;
+  if(!confirm('Download the original homebrew game '+e.title+' to your PS5?'))return;
   b.disabled=true;
   try{
    await get('/api/curated/download',{method:'POST',headers:{'Content-Type':'application/json'},
@@ -301,11 +301,10 @@ function appendHostFile(e){
   }catch(err){alert('Download could not start: '+err.message);b.disabled=false}
  };
  var open=document.createElement('a');
- open.href='https://archive.org/download/ultimate-rom-collection/'+
-   e.filename.split('/').map(encodeURIComponent).join('/');
- open.target='_blank';open.rel='noopener noreferrer';open.textContent='OPEN ON ARCHIVE';
- line.append(info,b,open);root.appendChild(line);
- el('sourceStatus').textContent='The file is in the indexed Archive listing, but direct access is not guaranteed. Try the PS5 download test first. If it fails, use OPEN ON ARCHIVE and import a permitted downloaded file through MY LIBRARY.';
+ open.href=e.source_page;
+  open.target='_blank';open.rel='noopener noreferrer';open.textContent='VIEW OFFICIAL RELEASE';
+  line.append(info,b,open);root.appendChild(line);
+ el('sourceStatus').textContent='This original homebrew game is pinned to the developer's release and checked with SHA-256 after transfer. If the source becomes unavailable, RetroVerse reports the error and leaves no corrupted file.';
 }
 async function diag(kind){
  var btn=el(kind==='storage'?'storageCheck':kind==='curl'?'curlCheck':'networkCheck');
@@ -344,7 +343,7 @@ async function loadJobs(){
    var d=document.createElement('div');d.className='file';var left=document.createElement('div');left.style.flex='1';
    left.textContent=j.filename+' · '+j.platform+' · '+j.status+(j.error?' — '+j.error:'');
    var bar=document.createElement('div');bar.className='progress';var fill=document.createElement('div');fill.style.width=(j.total>0?Math.min(100,100*j.received/j.total):0)+'%';bar.appendChild(fill);left.appendChild(bar);d.appendChild(left);
-   if(j.status==='downloading'){var b=document.createElement('button');b.className='secondary';b.textContent='CANCEL';b.onclick=async function(){await get('/api/archive/cancel',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:j.id})});loadJobs()};d.appendChild(b)}
+   if(j.status==='downloading'){var b=document.createElement('button');b.className='secondary';b.textContent='CANCEL';b.onclick=async function(){await get('/api/downloads/cancel',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:j.id})});loadJobs()};d.appendChild(b)}
    root.appendChild(d);
   });
  }catch(e){el('jobs').textContent='Status error: '+e.message}
