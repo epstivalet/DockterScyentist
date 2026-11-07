@@ -24,6 +24,7 @@
 #include "assets.inc"
 #include "catalog_data.inc"
 #include "verified_sources.inc"
+#include "archive_data.inc"
 #include <openssl/sha.h>
 #include "curl_net.h"
 #include "torrent_bridge.h"
@@ -175,6 +176,19 @@ static const verified_source_t *find_verified_source(const char *platform, const
     return NULL;
 }
 
+static const archive_source_t *find_archive_source(const char *platform, const char *file) {
+    for(size_t i=0;i<archive_sources_count;i++){
+        const archive_source_t *src=&archive_sources[i];
+        if(!strcmp(src->platform,platform)&&!strcmp(src->filename,file))return src;
+    }
+    return NULL;
+}
+static void archive_title(const char *filename,char *title,size_t n){
+    snprintf(title,n,"%s",filename);
+    char *dot=strrchr(title,'.');
+    if(dot)*dot=0;
+}
+
 static int digest_matches(const unsigned char digest[SHA256_DIGEST_LENGTH],const char *expected){
     static const char hex[]="0123456789abcdef";
     char actual[SHA256_DIGEST_LENGTH*2+1];
@@ -277,7 +291,7 @@ static void normalize(const char *raw,char *out,size_t max) {
 typedef struct {
     volatile int state, cancel;
     volatile uint64_t received,total;
-    char platform[20],filename[240],error[200],saved[340],path[800];
+    char platform[20],filename[240],error[200],saved[340],path[800],source_kind[16];
     unsigned int id;
 } Job;
 static Job job={0};
@@ -287,13 +301,23 @@ enum {J_IDLE=0,J_DOWNLOADING=1,J_COMPLETED=2,J_FAILED=3,J_CANCELED=4};
 
 static void *download_thread(void *arg){
     (void)arg;
-    const verified_source_t *source=find_verified_source(job.platform,job.path);
-    if(!source){
-        snprintf(job.error,sizeof job.error,"Selected file is not in approved source catalog");
+    const int is_archive=!strcmp(job.source_kind,"archive");
+    const verified_source_t *verified=NULL;
+    const archive_source_t *archive=NULL;
+    if(is_archive)archive=find_archive_source(job.platform,job.path);
+    else verified=find_verified_source(job.platform,job.path);
+    if(!verified&&!archive){
+        snprintf(job.error,sizeof job.error,"Selected file is not in its allowlisted source catalog");
+        job.state=J_FAILED;return NULL;
+    }
+    const char *base=is_archive?archive->filename:verified->filename;
+    const char *source_url=is_archive?archive->url:verified->url;
+    const uint64_t expected=is_archive?0:(uint64_t)verified->size;
+    if(!safe_name(base)||!allowed_ext(base)){
+        snprintf(job.error,sizeof job.error,"Source filename is not safe");
         job.state=J_FAILED;return NULL;
     }
     char dest[650],part[650];
-    const char *base=source->filename;
     if(directories(job.platform)<0){
         snprintf(job.error,sizeof job.error,"Unable to create PS5 library: %s",strerror(errno));
         job.state=J_FAILED;return NULL;
@@ -313,21 +337,21 @@ static void *download_thread(void *arg){
     if(!f){int e=errno;close(fd);unlink(part);
         snprintf(job.error,sizeof job.error,"Cannot open output stream: %s",strerror(e));
         job.state=J_FAILED;return NULL;}
-    job.total=(uint64_t)source->size;
-    int err=rv_https_download(source->url,f,DOWNLOAD_MAX,&job.cancel,&job.received,&job.total,
+    job.total=expected;
+    int err=rv_https_download(source_url,f,DOWNLOAD_MAX,&job.cancel,&job.received,&job.total,
                               job.error,sizeof job.error);
     if(fclose(f)!=0 && !err){
         snprintf(job.error,sizeof job.error,"Failed to flush downloaded file: %s",strerror(errno));
         err=-1;
     }
     if(job.cancel){unlink(part);job.state=J_CANCELED;return NULL;}
-    if(!err&&job.received!=source->size){
+    if(!err&&expected&&job.received!=expected){
         snprintf(job.error,sizeof job.error,"Incomplete or unexpected file size: got %llu, expected %llu bytes",
-            (unsigned long long)job.received,(unsigned long long)source->size);
+            (unsigned long long)job.received,(unsigned long long)expected);
         err=-1;
     }
-    if(!err){
-        int integrity=verify_sha256_file(part,source->sha256);
+    if(!err&&!is_archive){
+        int integrity=verify_sha256_file(part,verified->sha256);
         if(integrity!=0){
             snprintf(job.error,sizeof job.error,
                 integrity>0?"SHA-256 mismatch: source file rejected":"Could not verify downloaded SHA-256");
@@ -341,7 +365,7 @@ static void *download_thread(void *arg){
     unlink(part);
     if(err){job.state=J_FAILED;return NULL;}
     snprintf(job.saved,sizeof job.saved,"roms/%s/%s",job.platform,base);
-    job.total=source->size;
+    job.total=job.received;
     job.state=J_COMPLETED;return NULL;
 }
 static void jobs_response(int sock){
@@ -354,17 +378,25 @@ static void jobs_response(int sock){
     json(sock,200,body);
 }
 static void start_download(int sock,const char *body){
-    char platform[24],file[650],title[250];title[0]=0;
+    char platform[24],file[650],title[250],origin[16]="verified";title[0]=0;
     if(!json_str(body,"platform",platform,sizeof platform)||!json_str(body,"filename",file,sizeof file)||
        !json_bool(body,"rights_confirmed")){error(sock,400,"Platform, filename and rights confirmation are required");return;}
     json_str(body,"title",title,sizeof title);
-    if(!platform_ok(platform)||!find_verified_source(platform,file)){error(sock,400,"File is not an approved, verified developer release");return;}
+    (void)json_str(body,"origin",origin,sizeof origin);
+    if(!platform_ok(platform)){error(sock,400,"Unknown platform");return;}
+    const int is_archive=!strcmp(origin,"archive");
+    const verified_source_t *verified=NULL;
+    const archive_source_t *archive=NULL;
+    if(is_archive)archive=find_archive_source(platform,file);
+    else if(!strcmp(origin,"verified"))verified=find_verified_source(platform,file);
+    if(!archive&&!verified){error(sock,400,"File is not in the selected source allowlist");return;}
     pthread_mutex_lock(&lock);
     if(job.state==J_DOWNLOADING){pthread_mutex_unlock(&lock);error(sock,409,"A download is already running");return;}
     memset(&job,0,sizeof job);job.state=J_DOWNLOADING;job.id=++sequence;
     snprintf(job.platform,sizeof job.platform,"%s",platform);
     snprintf(job.path,sizeof job.path,"%s",file);
-    snprintf(job.filename,sizeof job.filename,"%s",find_verified_source(platform,file)->filename);
+    snprintf(job.source_kind,sizeof job.source_kind,"%s",origin);
+    snprintf(job.filename,sizeof job.filename,"%s",is_archive?archive->filename:verified->filename);
     pthread_t thread;
     int started=pthread_create(&thread,NULL,download_thread,NULL);
     if(started){job.state=J_FAILED;pthread_mutex_unlock(&lock);error(sock,500,"Could not create download worker");return;}
@@ -407,7 +439,7 @@ static void curated_matches(int sock,const char *url){
     param(url,"title",title,sizeof title);
     if(!platform_ok(platform)){error(sock,400,"Unknown platform");return;}
     normalize(title,wanted,sizeof wanted);
-    char body[16000];size_t used=(size_t)snprintf(body,sizeof body,
+    char body[24000];size_t used=(size_t)snprintf(body,sizeof body,
         "{\"supported\":true,\"files\":[");
     unsigned count=0;
     for(size_t i=0;i<verified_sources_count&&count<24;i++){
@@ -421,47 +453,82 @@ static void curated_matches(int sock,const char *url){
         json_quote(src->provider,provider,sizeof provider);
         json_quote(src->source_page,page,sizeof page);
         int written=snprintf(body+used,sizeof body-used,
-            "%s{\"filename\":%s,\"display_name\":%s,\"size\":%llu,\"source_kind\":\"official-release\",\"provider\":%s,\"source_page\":%s,\"verified_sha256\":true}",
+            "%s{\"filename\":%s,\"display_name\":%s,\"size\":%llu,\"source_kind\":\"verified\",\"provider\":%s,\"source_page\":%s,\"verified_sha256\":true}",
             count?",":"",filename,name,src->size,provider,page);
         if(written<0||(size_t)written>=sizeof body-used)break;
         used+=(size_t)written;count++;
     }
+    if(!strcmp(platform,"GC")||!strcmp(platform,"SNES")){
+        for(size_t i=0;i<archive_sources_count&&count<24;i++){
+            const archive_source_t *src=&archive_sources[i];
+            if(strcmp(platform,src->platform))continue;
+            char game[240],norm[260];archive_title(src->filename,game,sizeof game);
+            normalize(game,norm,sizeof norm);
+            if(!wanted[0]||strcmp(wanted,norm))continue;
+            char file[650],name[650];
+            json_quote(src->filename,file,sizeof file);
+            json_quote(src->filename,name,sizeof name);
+            int written=snprintf(body+used,sizeof body-used,
+                "%s{\"filename\":%s,\"display_name\":%s,\"source_kind\":\"archive\",\"provider\":\"Internet Archive\",\"verified_sha256\":false}",
+                count?",":"",file,name);
+            if(written<0||(size_t)written>=sizeof body-used)break;
+            used+=(size_t)written;count++;
+        }
+    }
     snprintf(body+used,sizeof body-used,"]}");
     json(sock,200,body);
 }
-
-/* The HOSTS page shows only original homebrew files with pinned checksums. */
+/* Source lists are compiled into the ELF. No browser leaves RetroVerse. */
 static void host_games(int sock,const char *url){
     char platform[32],letter[8],host[32];
     param(url,"platform",platform,sizeof platform);
     param(url,"letter",letter,sizeof letter);
     param(url,"host",host,sizeof host);
-    if(strcmp(host,"verified")){error(sock,400,"Unsupported source provider");return;}
     if(!platform_ok(platform)){error(sock,400,"Unknown platform");return;}
-    char body[20000];size_t used=(size_t)snprintf(body,sizeof body,
-        "{\"host\":\"verified\",\"indexed\":true,\"games\":[");
+    const int is_archive=!strcmp(host,"archive");
+    if(!is_archive && strcmp(host,"verified")){error(sock,400,"Unsupported source provider");return;}
+    char body[65000];size_t used=(size_t)snprintf(body,sizeof body,
+        "{\"host\":\"%s\",\"indexed\":true,\"games\":[",host);
     unsigned count=0;
-    for(size_t i=0;i<verified_sources_count;i++){
-        const verified_source_t *src=&verified_sources[i];
-        if(strcmp(platform,src->platform))continue;
-        unsigned char first=(unsigned char)src->title[0];
-        char initial=(char)(isalpha(first)?toupper(first):'#');
-        if(letter[0] && toupper((unsigned char)letter[0])!=initial)continue;
-        char qtitle[500],qpath[700],qprovider[400],qpage[800];
-        json_quote(src->title,qtitle,sizeof qtitle);
-        json_quote(src->path,qpath,sizeof qpath);
-        json_quote(src->provider,qprovider,sizeof qprovider);
-        json_quote(src->source_page,qpage,sizeof qpage);
-        int written=snprintf(body+used,sizeof body-used,
-            "%s{\"title\":%s,\"filename\":%s,\"platform\":\"%s\",\"availability\":\"verified-source\",\"size\":%llu,\"provider\":%s,\"source_page\":%s}",
-            count?",":"",qtitle,qpath,platform,src->size,qprovider,qpage);
-        if(written<0||(size_t)written>=sizeof body-used)break;
-        used+=(size_t)written;count++;
+    if(is_archive){
+        for(size_t i=0;i<archive_sources_count&&count<180;i++){
+            const archive_source_t *src=&archive_sources[i];
+            if(strcmp(platform,src->platform))continue;
+            char title[240];archive_title(src->filename,title,sizeof title);
+            unsigned char first=(unsigned char)title[0];
+            char initial=(char)(isalpha(first)?toupper(first):'#');
+            if(letter[0] && toupper((unsigned char)letter[0])!=initial)continue;
+            char qtitle[600],qfile[650];
+            json_quote(title,qtitle,sizeof qtitle);
+            json_quote(src->filename,qfile,sizeof qfile);
+            int written=snprintf(body+used,sizeof body-used,
+                "%s{\"title\":%s,\"filename\":%s,\"platform\":\"%s\",\"source_kind\":\"archive\",\"verified_sha256\":false}",
+                count?",":"",qtitle,qfile,platform);
+            if(written<0||(size_t)written>=sizeof body-used)break;
+            used+=(size_t)written;count++;
+        }
+    }else{
+        for(size_t i=0;i<verified_sources_count;i++){
+            const verified_source_t *src=&verified_sources[i];
+            if(strcmp(platform,src->platform))continue;
+            unsigned char first=(unsigned char)src->title[0];
+            char initial=(char)(isalpha(first)?toupper(first):'#');
+            if(letter[0] && toupper((unsigned char)letter[0])!=initial)continue;
+            char qtitle[500],qpath[700],qprovider[400],qpage[800];
+            json_quote(src->title,qtitle,sizeof qtitle);
+            json_quote(src->path,qpath,sizeof qpath);
+            json_quote(src->provider,qprovider,sizeof qprovider);
+            json_quote(src->source_page,qpage,sizeof qpage);
+            int written=snprintf(body+used,sizeof body-used,
+                "%s{\"title\":%s,\"filename\":%s,\"platform\":\"%s\",\"source_kind\":\"verified\",\"availability\":\"verified-source\",\"size\":%llu,\"provider\":%s,\"source_page\":%s}",
+                count?",":"",qtitle,qpath,platform,src->size,qprovider,qpage);
+            if(written<0||(size_t)written>=sizeof body-used)break;
+            used+=(size_t)written;count++;
+        }
     }
     snprintf(body+used,sizeof body-used,"]}");
     json(sock,200,body);
 }
-
 /* A real download test fetches a pinned homebrew file and checks SHA-256
  * before deleting the temporary copy. No commercial ROM archive is used. */
 
@@ -732,7 +799,7 @@ static void serve(int sock) {
     if(path_len>=sizeof path){error(sock,414,"URL too long");return;}memcpy(path,url,path_len);path[path_len]=0;
     if(!strcmp(method,"GET")){
         if(!strcmp(path,"/")||!strcmp(path,"/index.html")){response(sock,200,"OK","text/html; charset=utf-8",ui_page,UI_PAGE_LEN);return;}
-        if(!strcmp(path,"/api/health")){json(sock,200,"{\"ok\":true,\"mode\":\"ps5\",\"version\":\"0.10\",\"features\":[\"catalog\",\"art\",\"verified_sources\",\"sha256_downloads\",\"torrent_bridge\",\"upload\",\"library\"]}");return;}
+        if(!strcmp(path,"/api/health")){json(sock,200,"{\"ok\":true,\"mode\":\"ps5\",\"version\":\"0.11\",\"features\":[\"catalog\",\"art\",\"verified_sources\",\"sha256_downloads\",\"torrent_bridge\",\"upload\",\"library\"]}");return;}
         if(!strcmp(path,"/api/cover")){cover_image(sock,url);return;}
         if(!strcmp(path,"/api/catalog-index")){catalog_index(sock,url);return;}
         if(!strcmp(path,"/api/host-games")){host_games(sock,url);return;}
