@@ -26,6 +26,7 @@
 #include "verified_sources.inc"
 #include <openssl/sha.h>
 #include "curl_net.h"
+#include "torrent_bridge.h"
 
 #define PORT 8765
 #define HEADER_MAX 16384
@@ -671,6 +672,51 @@ static void cover_image(int sock,const char *request_url){
     free(data);
 }
 
+/* Local torrent engine bridge; the remote service does not scrape source pages.
+ * Files are saved by PS5Torrent under /data/retroverse/torrents/. */
+static void torrent_request(int sock,const char *route,const char *method,const char *body){
+    char magnet[1850]={0},action[20]={0};int id=-1;
+    if(!strcmp(route,"add")){
+        if(!body||!json_str(body,"magnet",magnet,sizeof magnet)||
+           !json_bool(body,"rights_confirmed")){
+            error(sock,400,"Magnet URI and download rights confirmation required");return;
+        }
+        if(mkdir(BASE_DIR,0700)<0&&errno!=EEXIST){
+            error(sock,500,"Cannot create RetroVerse torrent storage folder");return;
+        }
+    }
+    if(!strcmp(route,"action")){
+        char idstr[20]={0};
+        if(!body||!json_str(body,"action",action,sizeof action)||
+           !json_str(body,"id",idstr,sizeof idstr)){
+            error(sock,400,"Torrent ID and action are required");return;
+        }
+        for(size_t i=0;idstr[i];i++)if(!isdigit((unsigned char)idstr[i])){
+            error(sock,400,"Invalid torrent ID");return;
+        }
+        if(!idstr[0]){error(sock,400,"Empty torrent ID");return;}
+        long num=strtol(idstr,NULL,10);
+        if(num<0||num>10000){error(sock,400,"Torrent ID out of range");return;}
+        id=(int)num;
+        if(strcmp(action,"start")&&strcmp(action,"stop")&&strcmp(action,"remove")){
+            error(sock,400,"Unsupported torrent action");return;
+        }
+        route=action;
+    }
+    char *result=NULL,details[256]={0};size_t n=0;int upstream=0;
+    int rc=rv_torrent_request(method,route,magnet,id,&result,&n,&upstream,
+                              details,sizeof details);
+    if(rc!=0){
+        char quoted[560],output[700];json_quote(details,quoted,sizeof quoted);
+        snprintf(output,sizeof output,"{\"error\":%s}",quoted);
+        json(sock,rc==-1?400:503,output);return;
+    }
+    int code=(upstream>=200&&upstream<300)?200:
+             (upstream>=400&&upstream<500)?400:502;
+    response(sock,code,code==200?"OK":"Error","application/json; charset=utf-8",
+             result,n);free(result);
+}
+
 static void serve(int sock) {
     unsigned char header[HEADER_MAX+1];size_t used=0;
     size_t split=0;
@@ -693,6 +739,8 @@ static void serve(int sock) {
         if(!strcmp(path,"/api/curated/matches")){curated_matches(sock,url);return;}
         if(!strcmp(path,"/api/jobs")){jobs_response(sock);return;}
         if(!strcmp(path,"/api/library")){library_response(sock);return;}
+        if(!strcmp(path,"/api/torrent/status")){torrent_request(sock,"status","GET",NULL);return;}
+        if(!strcmp(path,"/api/torrent/list")){torrent_request(sock,"list","GET",NULL);return;}
         error(sock,404,"Not found");return;
     }
     if(!strcmp(method,"POST")){
@@ -705,6 +753,8 @@ static void serve(int sock) {
         while(have<len){ssize_t n=recv(sock,data+have,(size_t)len-have,0);if(n<=0){error(sock,400,"Incomplete request");return;}have+=(size_t)n;}
         data[have]=0;
         if(!strcmp(path,"/api/curated/download")){start_download(sock,data);return;}
+        if(!strcmp(path,"/api/torrent/add")){torrent_request(sock,"add","POST",data);return;}
+        if(!strcmp(path,"/api/torrent/action")){torrent_request(sock,"action","POST",data);return;}
         if(!strcmp(path,"/api/test-download")){test_download(sock);return;}
         if(!strcmp(path,"/api/diagnostics/storage")){diagnostic_storage(sock);return;}
         if(!strcmp(path,"/api/diagnostics/network")){diagnostic_network(sock);return;}
