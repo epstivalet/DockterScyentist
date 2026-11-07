@@ -25,7 +25,14 @@
 #include "catalog_data.inc"
 #include "verified_sources.inc"
 #include "archive_sources.inc"
+/* Backward-compatible SNES/GC flat HTML indexes use a distinct type/symbol. */
+#define archive_source_t legacy_archive_source_t
+#define archive_sources legacy_archive_sources
+#define archive_sources_count legacy_archive_sources_count
 #include "archive_data.inc"
+#undef archive_source_t
+#undef archive_sources
+#undef archive_sources_count
 #include <openssl/sha.h>
 #include <openssl/evp.h>
 #include "curl_net.h"
@@ -178,9 +185,9 @@ static const verified_source_t *find_verified_source(const char *platform, const
     return NULL;
 }
 
-static const archive_source_t *find_archive_source(const char *platform, const char *file) {
-    for(size_t i=0;i<archive_sources_count;i++){
-        const archive_source_t *src=&archive_sources[i];
+static const legacy_archive_source_t *find_legacy_archive_source(const char *platform, const char *file) {
+    for(size_t i=0;i<legacy_archive_sources_count;i++){
+        const legacy_archive_source_t *src=&legacy_archive_sources[i];
         if(!strcmp(src->platform,platform)&&!strcmp(src->filename,file))return src;
     }
     return NULL;
@@ -340,8 +347,8 @@ static void *download_thread(void *arg){
     (void)arg;
     const int is_archive=!strcmp(job.source_kind,"archive");
     const verified_source_t *verified=NULL;
-    const archive_source_t *archive=NULL;
-    if(is_archive)archive=find_archive_source(job.platform,job.path);
+    const legacy_archive_source_t *archive=NULL;
+    if(is_archive)archive=find_legacy_archive_source(job.platform,job.path);
     else verified=find_verified_source(job.platform,job.path);
     if(!verified&&!archive){
         snprintf(job.error,sizeof job.error,"Selected file is not in its allowlisted source catalog");
@@ -549,8 +556,8 @@ static void start_download(int sock,const char *body){
     if(!platform_ok(platform)){error(sock,400,"Unknown platform");return;}
     const int is_archive=!strcmp(origin,"archive");
     const verified_source_t *verified=NULL;
-    const archive_source_t *archive=NULL;
-    if(is_archive)archive=find_archive_source(platform,file);
+    const legacy_archive_source_t *archive=NULL;
+    if(is_archive)archive=find_legacy_archive_source(platform,file);
     else if(!strcmp(origin,"verified"))verified=find_verified_source(platform,file);
     if(!archive&&!verified){error(sock,400,"File is not in the selected source allowlist");return;}
     pthread_mutex_lock(&lock);
@@ -622,8 +629,8 @@ static void curated_matches(int sock,const char *url){
         used+=(size_t)written;count++;
     }
     if(!strcmp(platform,"GC")||!strcmp(platform,"SNES")){
-        for(size_t i=0;i<archive_sources_count&&count<24;i++){
-            const archive_source_t *src=&archive_sources[i];
+        for(size_t i=0;i<legacy_archive_sources_count&&count<24;i++){
+            const legacy_archive_source_t *src=&legacy_archive_sources[i];
             if(strcmp(platform,src->platform))continue;
             char game[240],norm[260];archive_title(src->filename,game,sizeof game);
             normalize(game,norm,sizeof norm);
@@ -654,8 +661,8 @@ static void host_games(int sock,const char *url){
         "{\"host\":\"%s\",\"indexed\":true,\"games\":[",host);
     unsigned count=0;
     if(is_archive){
-        for(size_t i=0;i<archive_sources_count&&count<180;i++){
-            const archive_source_t *src=&archive_sources[i];
+        for(size_t i=0;i<legacy_archive_sources_count&&count<180;i++){
+            const legacy_archive_source_t *src=&legacy_archive_sources[i];
             if(strcmp(platform,src->platform))continue;
             char title[240];archive_title(src->filename,title,sizeof title);
             unsigned char first=(unsigned char)title[0];
