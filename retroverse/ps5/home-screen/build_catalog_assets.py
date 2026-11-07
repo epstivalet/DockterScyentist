@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Build offline native text indexes from current public thumbnail/file listings.
+"""Bundle native offline indexes with approved, hash-pinned official homebrew sources.
 
-The foreground PS5 app can browse catalogs even without a running helper.
-No game binaries are redistributed; only filenames from source indexes.
+A title appearing in Libretro's artwork index does not imply it is downloadable.
+The native HOSTS list contains ONLY explicit verified_sources.json entries.
 """
 from pathlib import Path
 import importlib.util
@@ -19,15 +19,16 @@ def load(name):
     return mod
 
 lib=load("catalog_build")
-archives=load("archive_catalog_build")
+official=load("verified_source_build")
+rows=official.validated()
 for platform,system in lib.SYSTEMS.items():
     names=lib.fetch(platform,system)
     clean=sorted(set(x[:-4] for x in names if x.lower().endswith(".png")),key=str.casefold)
     (out/(platform+".txt")).write_text("\n".join(clean)+"\n",encoding="utf-8")
     print("catalog",platform,len(clean),flush=True)
-for platform,name in archives.COLLECTIONS.items():
-    names=archives.raw_listing(platform,name)
-    # The index is a hint, not proof every file can be transferred.
-    (out/("HOST_"+platform+".txt")).write_text("\n".join(names)+"\n",encoding="utf-8")
-    print("host",platform,len(names),flush=True)
+for platform in lib.SYSTEMS:
+    names=sorted((r["filename"] for r in rows if r["platform"]==platform),key=str.casefold)
+    (out/("HOST_"+platform+".txt")).write_text(
+        "\n".join(names)+("\n" if names else ""),encoding="utf-8")
+    print("verified official downloads",platform,len(names),flush=True)
 print("Catalog assets complete",sum(p.stat().st_size for p in out.glob("*.txt")),"bytes")
