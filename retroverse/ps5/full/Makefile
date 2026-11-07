@@ -21,8 +21,8 @@ verified_sources.inc: verified_source_build.py verified_sources.json
 	python3 verified_source_build.py
 ca_data.inc: embed_ca.py
 	python3 embed_ca.py
-$(ELF): main.c curl_net.c curl_net.h assets.inc catalog_data.inc verified_sources.inc ca_data.inc
-	$(CC) $(CFLAGS) -o $@ main.c curl_net.c $(LDADD)
+$(ELF): main.c curl_net.c torrent_bridge.c torrent_bridge.h curl_net.h assets.inc catalog_data.inc verified_sources.inc ca_data.inc
+	$(CC) $(CFLAGS) -o $@ main.c curl_net.c torrent_bridge.c $(LDADD)
 test: $(ELF)
 	$(PS5_DEPLOY) -h $(PS5_HOST) -p $(PS5_PORT) $(ELF)
 clean:
