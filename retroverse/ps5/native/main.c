@@ -229,7 +229,7 @@ static void load_games(void){
         if(!data){snprintf(status_line,sizeof status_line,"FAILED LOADING EMBEDDED CATALOG");return;}
         parse_catalog(data);free(data);
     }else if(screen_tab==1){
-        snprintf(path,sizeof path,"/api/host-games?host=archive&platform=%s&letter=%c",
+        snprintf(path,sizeof path,"/api/host-games?host=verified&platform=%s&letter=%c",
                  consoles[sys].id,letter);
         char *data=local_request("GET",path,NULL);
         if(!data){snprintf(status_line,sizeof status_line,"HOST INDEX UNAVAILABLE");return;}
@@ -284,7 +284,7 @@ static void check_source(void) {
     if(!data){snprintf(status_line,sizeof status_line,"SOURCE LOOKUP UNAVAILABLE");return;}
     if(!json_string(data,"filename",source_path,sizeof source_path))
         snprintf(status_line,sizeof status_line,"NO MATCHING CURATED DOWNLOAD FOR THIS GAME");
-    else snprintf(status_line,sizeof status_line,"CURATED SOURCE FOUND   PRESS X AGAIN TO DOWNLOAD");
+    else snprintf(status_line,sizeof status_line,"OFFICIAL SOURCE FOUND   PRESS X AGAIN TO DOWNLOAD");
     free(data);
 }
 static void download_selected(void){
@@ -439,7 +439,7 @@ static void render(void){
         outline(85,440,1740,523,c->r,c->g,c->b);
         text(137,479,"GAME DETAILS",7,c->r,c->g,c->b,22);
         if(g)text(137,571,g->title,5,248,248,253,58);
-        text(137,647,source_path[0]?"CURATED FILE FOUND":"NO DIRECT SOURCE FOUND",4,
+        text(137,647,source_path[0]?"OFFICIAL FILE FOUND":"NO DIRECT SOURCE FOUND",4,
              source_path[0]?140:243,source_path[0]?231:159,source_path[0]?157:152,40);
         text(137,716,source_path[0]?"X = DOWNLOAD TO PS5 STORAGE":"O = BACK TO BROWSER",4,221,226,243,49);
         text(137,800,"ONLY DOWNLOAD FILES YOU ARE AUTHORIZED TO USE",3,153,168,201,60);
