@@ -103,12 +103,12 @@ nav button{flex:0 0 auto;white-space:nowrap;font-size:12px;padding:10px 12px}
  <p class="subtle">Browse external source directories, then paste a magnet link for content you are authorized to download. A directory listing or magnet does not establish redistribution rights or file availability. Torrent downloads remain separate from the verified HTTPS library until reviewed.</p>
  <div class="actions">
  <a class="secondary" href="https://r-roms.github.io/" target="_blank" rel="noopener noreferrer">Roms Megathread · Browse</a>
- <a class="secondary" href="https://r-roms.github.io/roms/torrents/" target="_blank" rel="noopener noreferrer">Megathread · Torrents</a>
+ <a class="secondary" href="https://r-roms.github.io/General/torrents" target="_blank" rel="noopener noreferrer">Megathread · Torrents</a>
  <a class="secondary" href="https://minerva-archive.org/browse/" target="_blank" rel="noopener noreferrer">MiNERVA · Systems</a>
  <button class="secondary" id="torrentRefresh">REFRESH TORRENTS</button>
  </div>
  <div class="pane"><div class="torrent-row"><strong id="torrentEngine">Checking PS5Torrent service…</strong><span class="torrent-stat">Local PS5 port 12389</span></div>
- <p class="subtle">The separately installed PS5Torrent ELF must be running on the same console. RetroVerse connects to it through local loopback. Torrent transfers are stored under /data/retroverse/torrents/torrents/, not automatically imported into MY LIBRARY.</p></div>
+ <p class="subtle">The separately installed PS5Torrent ELF must be running on the same console. RetroVerse connects to it through local loopback. Torrent transfers are stored under /data/retroverse/torrents/, not automatically imported into MY LIBRARY.</p></div>
  <div class="pane">
  <label for="torrentMagnet"><strong>MAGNET LINK</strong></label>
  <textarea id="torrentMagnet" spellcheck="false" placeholder="magnet:?xt=urn:btih:..."></textarea>
@@ -398,7 +398,7 @@ async function loadTorrents(){
    var title=document.createElement('strong');title.textContent=t.name||'Unnamed torrent';
    var progress=Number(t.progress)||0;
    // PS5Torrent uses percent progress in a number from 0 to 100.
-   if(progress>=0&&progress<=1&&Number(t.downloaded)>0&&Number(t.size)>0)progress=100*Number(t.downloaded)/Number(t.size);
+   if(Number(t.size)>0)progress=100*Number(t.downloaded||0)/Number(t.size);
    if(progress>100)progress=100;if(progress<0)progress=0;
    var meta=document.createElement('div');meta.className='torrent-stat';
    meta.textContent=String(t.state||'unknown').toUpperCase()+' · '+progress.toFixed(1)+'% · '+torrentBytes(t.downloaded)+' / '+torrentBytes(t.size)+' · '+torrentBytes(t.speed_down)+'/s · '+(t.peers||0)+' peers';
