@@ -460,7 +460,7 @@ static void input_action(unsigned pressed){
   dialog=false;tab=(tab+1)%5;load_games();
   if(tab==2)load_library();
   if(tab==3)refresh_jobs();
-   if(tab==4)refresh_torrents();
+  if(tab==4)refresh_torrents();
   return;
  }
  if(pressed&BTN_O){dialog=false;return;}
@@ -475,6 +475,7 @@ static void input_action(unsigned pressed){
  }
  if(pressed&BTN_SQUARE){
   if(tab==3)refresh_jobs();
+  else if(tab==4)refresh_torrents();
   else {load_games();if(tab==2)load_library();}
   return;
  }
@@ -496,10 +497,10 @@ static void draw(Canvas&c) noexcept {
  c.text(70,30,"RETROVERSE",11,white);
  c.text(1180,43,"PS5 NATIVE STORE",6,sys.accent);
  const char*tabs[]={"STORE","HOSTS","MY LIBRARY","DOWNLOADS","TORRENTS"};
- for(int i=0;i<4;i++){
-  unsigned x=68+306*unsigned(i);
-  c.rectangle(x,171,288,65,i==tab?sys.accent:pane2);
-  c.text(x+26,186,tabs[i],5,i==tab?bg:white);
+ for(int i=0;i<5;i++){
+  unsigned x=68+304*unsigned(i);
+  c.rectangle(x,171,286,65,i==tab?sys.accent:pane2);
+  c.text(x+18,186,tabs[i],5,i==tab?bg:white);
  }
  c.text(75,284,sys.name,7,sys.accent);
  c.text(80,367,"L1 / R1 CHANGE CONSOLE",4,muted);
@@ -529,6 +530,11 @@ static void draw(Canvas&c) noexcept {
  if(tab==3){
   c.text(1003,640,"DOWNLOAD MANAGER",6,white);
   c.text(1003,722,transfer,3,muted);
+ }else if(tab==4){
+  c.text(1003,620,"TORRENT MANAGER",6,white);
+  c.text(1003,695,torrent_line,3,muted);
+  c.text(1003,759,"PASTE MAGNET: PS5-IP PORT 8765",4,teal);
+  c.text(1003,815,"SOURCES: R-ROMS / MINERVA",3,muted);
  }else{
   int count=filtered_count();
   int start=(highlight>4)?highlight-4:0;
