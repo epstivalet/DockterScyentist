@@ -85,13 +85,13 @@ nav button{flex:0 0 auto;white-space:nowrap;font-size:12px;padding:10px 12px}
  <div class="row"><h2>AVAILABLE BY HOST</h2><span class="pill">Direct downloads to PS5</span></div>
  <p class="subtle">Select a console and game, then download directly to your PS5. Official homebrew files have SHA-256 checksums; Archive files are unverified third-party uploads. Only download copies you are authorized to use.</p>
  <div class="actions">
- <select id="hostSelector" aria-label="Select game source"><option value="verified">Official Developer Releases</option><option value="archive">Internet Archive · Direct downloads</option></select>
+ <select id="hostSelector" aria-label="Select game source"><option value="verified">Official Developer Releases</option><option value="archive">Internet Archive · GC/SNES</option><option value="archive-ps1">Internet Archive · PS1 BIN/CUE</option><option value="archive-gc">Internet Archive · GameCube ISO/GCM</option></select>
  <select id="hostPlatform" aria-label="Select console"></select>
  <button class="secondary" id="hostRefresh">REFRESH FILE LIST</button>
  </div>
  <div class="letters" id="hostLetters"></div>
  <div class="row"><h2 id="hostHeading">Indexed files</h2><input type="search" id="hostFilter" placeholder="Filter indexed filenames…"></div>
- <p class="subtle" id="hostInfo">Choose a source and console.</p>
+ <p class="subtle" id="hostInfo">Choose a source and console.</p><div class="actions" id="archivePages" style="display:none"><button class="secondary" id="archivePrev">PREVIOUS PAGE</button><span class="pill" id="archivePageStatus">PAGE 1</span><button class="secondary" id="archiveNext">NEXT PAGE</button></div>
  <div class="cards" id="hostCards"></div>
 </section>
 <section id="library" class="hidden"><h2>MY PS5 LIBRARY</h2><p class="subtle">Files imported or downloaded to /data/retroverse/roms/ on your PS5. No system files are modified.</p>
@@ -261,33 +261,42 @@ async function uploadGame(){
  }catch(e){el('uploadState').textContent='Upload failed: '+e.message}
 }
 
-var hostLetter='A',hostEntries=[],hostLoadToken=0;
+var hostLetter='A',hostEntries=[],hostLoadToken=0,hostPage=0,hostHasNext=false;
 function renderHostLetters(){
  var box=el('hostLetters');box.replaceChildren();
- '#ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').forEach(function(ch){
-  var b=document.createElement('button');b.textContent=ch;b.className=ch===hostLetter?'active':'';
-  b.onclick=function(){hostLetter=ch;renderHostLetters();loadHostGames()};
+ '*#ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').forEach(function(ch){
+  var b=document.createElement('button');b.textContent=ch==='*'?'ALL':ch;b.className=ch===hostLetter?'active':'';
+  b.onclick=function(){hostLetter=ch;hostPage=0;renderHostLetters();loadHostGames()};
   box.appendChild(b);
  });
 }
 function hostGameTitle(f){return String(f.title||'').trim()}
 async function loadHostGames(){
  var source=el('hostSelector').value,p=el('hostPlatform').value,token=++hostLoadToken;
+ var meta=source==='archive-ps1'||source==='archive-gc';
+ var supported=source==='archive'?p==='GC'||p==='SNES':source==='archive-ps1'?p==='PS1':source==='archive-gc'?p==='GC':true;
  el('hostCards').replaceChildren();
- el('hostHeading').textContent=(source==='archive'?'Internet Archive':'Official Homebrew')+' · '+p+' · '+hostLetter;
- if(source==='archive'&&p!=='GC'&&p!=='SNES'){
-  hostEntries=[];el('hostInfo').textContent='Archive downloads are configured for GameCube and SNES. Select one of these consoles.';return;
- }
- el('hostInfo').textContent='Loading '+(source==='archive'?'Archive index':'verified releases')+' for '+p+'…';
+ el('archivePages').style.display=meta?'flex':'none';
+ el('hostHeading').textContent=(meta?'Internet Archive metadata':source==='archive'?'Internet Archive':'Official Homebrew')+' · '+p+' · '+hostLetter;
+ if(!supported){hostEntries=[];el('hostInfo').textContent=meta?'Select the matching console (PS1 or GC).':'The legacy Archive source covers GC and SNES.';return;}
+ el('hostInfo').textContent='Loading indexed file names…';
  try{
-  var data=await get('/api/host-games?host='+enc(source)+'&platform='+enc(p)+'&letter='+enc(hostLetter));
+  var url='/api/host-games?host='+enc(source)+'&platform='+enc(p)+'&letter='+enc(meta?hostLetter:hostLetter==='*'?'A':hostLetter);
+  if(meta)url+='&page='+hostPage+'&query='+enc(el('hostFilter').value.trim());
+  var data=await get(url);
   if(token!==hostLoadToken)return;
   hostEntries=data.games||[];
-  el('hostInfo').textContent=source==='archive'?
-   (hostEntries.length+' files under '+hostLetter+'. Direct PS5 download; files are not checksum verified.'):
-   (hostEntries.length+' verified homebrew releases under '+hostLetter+'. SHA-256 checked after transfer.');
+  hostHasNext=!!data.has_next;
+  if(meta){
+   el('archivePageStatus').textContent='PAGE '+(hostPage+1)+' · '+(data.total||0)+' FILES';
+   el('archivePrev').disabled=hostPage===0;
+   el('archiveNext').disabled=!hostHasNext;
+   el('hostInfo').textContent=(data.total||0)+' indexed files · '+hostEntries.length+' shown. PS1 BIN/CUE track groups are downloaded together when indexed. Individual downloads can fail if a source is restricted or offline.';
+  }else el('hostInfo').textContent=source==='archive'?
+   hostEntries.length+' archive filenames under '+hostLetter+'; availability and checksums are unverified.':
+   hostEntries.length+' approved developer files under '+hostLetter+'; SHA-256 checked after download.';
   renderHostCards();
- }catch(e){if(token===hostLoadToken)el('hostInfo').textContent='Host index error: '+e.message}
+ }catch(e){if(token===hostLoadToken)el('hostInfo').textContent='Host index error: '+e.message;}
 }
 function renderHostCards(){
  var root=el('hostCards');root.replaceChildren();
@@ -300,7 +309,7 @@ function renderHostCards(){
   var img=document.createElement('img');img.loading='lazy';img.alt='Artwork for '+e.title;img.src=getArt(g,'Named_Boxarts');
   img.onerror=function(){img.onerror=null;img.style.visibility='hidden'};
   var label=document.createElement('strong');label.textContent=e.title;
-  var small=document.createElement('small');small.textContent=e.source_kind==='archive'?'ARCHIVE · DOWNLOAD':'OFFICIAL RELEASE · DOWNLOAD';
+  var small=document.createElement('small');small.textContent=e.source_kind==='archive-index'?'ARCHIVE FILE · '+((Number(e.size)||0)/1048576).toFixed(1)+' MiB':e.source_kind==='archive'?'ARCHIVE · DOWNLOAD':'OFFICIAL RELEASE · DOWNLOAD';
   b.append(img,label,small);b.onclick=function(){showDetails(g);appendHostFile(e)};
   root.appendChild(b);
  });
@@ -308,20 +317,38 @@ function renderHostCards(){
 function appendHostFile(e){
  var root=el('sourceMatches');root.replaceChildren();
  var line=document.createElement('div');line.className='source';
- var isArchive=e.source_kind==='archive';
- var info=document.createElement('span');info.textContent=(isArchive?'Archive / unverified: ':'Developer / SHA-256 verified: ')+e.filename;
- var b=document.createElement('button');b.textContent='DOWNLOAD TO PS5';
+ var metadata=e.source_kind==='archive-index';
+ var isArchive=metadata||e.source_kind==='archive';
+ var label=metadata?(e.display_name||e.title):e.filename;
+ var info=document.createElement('span');
+ info.textContent=(metadata?'Internet Archive · '+((Number(e.size)||0)/1048576).toFixed(1)+' MiB · ':
+   isArchive?'Archive / unverified · ':'Developer / SHA-256 verified · ')+label;
+ var b=document.createElement('button');
+ b.textContent=metadata&&e.platform==='PS1'?'DOWNLOAD BIN/CUE GROUP TO PS5':'DOWNLOAD TO PS5';
  b.onclick=async function(){
-  if(!confirm('Download '+e.filename+' directly to your PS5?\nConfirm you have permission to make this copy.'))return;
+  var message='Download '+label+' directly to your PS5? Confirm you have permission to make this copy.';
+  if(metadata&&e.platform==='PS1')message+='\nMatching BIN tracks and CUE sheets will be requested together.';
+  if(!confirm(message))return;
   b.disabled=true;
   try{
-   await get('/api/curated/download',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({platform:e.platform,filename:e.filename,title:e.title,origin:e.source_kind||'verified',rights_confirmed:true})});
+   await get(metadata?'/api/archive/download':'/api/curated/download',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({platform:e.platform,filename:e.filename,title:e.title,
+        origin:metadata?'archive-index':e.source_kind||'verified',rights_confirmed:true})});
    el('detailDialog').close();tab('downloads');loadJobs();
-  }catch(err){alert('Download could not start: '+err.message);b.disabled=false}
+  }catch(err){alert('Download could not start: '+err.message);b.disabled=false;}
  };
- line.append(info,b);root.appendChild(line);
- el('sourceStatus').textContent=isArchive?'Direct Archive HTTPS transfer to PS5; no trusted checksum available.':'Direct SHA-256-verified transfer to PS5.';
+ line.append(info,b);
+ if(metadata){
+  var external=document.createElement('a');external.href=e.direct_url;
+  external.target='_blank';external.rel='noopener noreferrer';external.textContent='VIEW DIRECT FILE';
+  line.appendChild(external);
+ }
+ root.appendChild(line);
+ el('sourceStatus').textContent=metadata?
+  'Checks indexed file size and any SHA-1 or MD5 checksum supplied by Internet Archive. Listings may be restricted or unavailable. Already existing files are never overwritten.':
+  isArchive?'Archive file link only; checksum not independently verified.':
+  'Direct SHA-256-verified developer release transfer.';
 }
 async function diag(kind){
  var btn=el(kind==='storage'?'storageCheck':kind==='curl'?'curlCheck':'networkCheck');
@@ -492,10 +519,23 @@ el('closeDetail').onclick=function(){el('detailDialog').close()};
 el('findDownload').onclick=findSources;
 el('importThis').onclick=function(){el('detailDialog').close();tab('library');el('uploadPlatform').value=platform;el('uploadFile').click()};
 el('uploadButton').onclick=uploadGame;el('refreshLibrary').onclick=loadLibrary;el('refreshJobs').onclick=loadJobs;
-el('hostSelector').onchange=function(){hostLetter='A';if(el('hostSelector').value==='archive')el('hostPlatform').value='GC';renderHostLetters();loadHostGames()};
-el('hostPlatform').onchange=function(){hostLetter='A';renderHostLetters();loadHostGames()};
+el('hostSelector').onchange=function(){
+ hostPage=0;hostLetter='A';el('hostFilter').value='';
+ var source=el('hostSelector').value;
+ if(source==='archive')el('hostPlatform').value='GC';
+ if(source==='archive-gc')el('hostPlatform').value='GC';
+ if(source==='archive-ps1')el('hostPlatform').value='PS1';
+ renderHostLetters();loadHostGames();
+};
+el('hostPlatform').onchange=function(){hostPage=0;hostLetter='A';el('hostFilter').value='';renderHostLetters();loadHostGames()};
 el('hostRefresh').onclick=loadHostGames;
-el('hostFilter').oninput=renderHostCards;
+el('hostFilter').oninput=function(){
+ var source=el('hostSelector').value;
+ if(source==='archive-ps1'||source==='archive-gc'){hostPage=0;loadHostGames();}
+ else renderHostCards();
+};
+el('archivePrev').onclick=function(){if(hostPage>0){hostPage--;loadHostGames();}};
+el('archiveNext').onclick=function(){if(hostHasNext){hostPage++;loadHostGames();}};
 el('storageCheck').onclick=function(){diag('storage')};
 el('networkCheck').onclick=function(){diag('network')};
 el('curlCheck').onclick=function(){diag('curl')};
