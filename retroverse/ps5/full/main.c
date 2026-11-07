@@ -732,7 +732,7 @@ static void serve(int sock) {
     if(path_len>=sizeof path){error(sock,414,"URL too long");return;}memcpy(path,url,path_len);path[path_len]=0;
     if(!strcmp(method,"GET")){
         if(!strcmp(path,"/")||!strcmp(path,"/index.html")){response(sock,200,"OK","text/html; charset=utf-8",ui_page,UI_PAGE_LEN);return;}
-        if(!strcmp(path,"/api/health")){json(sock,200,"{\"ok\":true,\"mode\":\"ps5\",\"version\":\"0.9\",\"features\":[\"catalog\",\"art\",\"verified_sources\",\"sha256_downloads\",\"upload\",\"library\"]}");return;}
+        if(!strcmp(path,"/api/health")){json(sock,200,"{\"ok\":true,\"mode\":\"ps5\",\"version\":\"0.10\",\"features\":[\"catalog\",\"art\",\"verified_sources\",\"sha256_downloads\",\"upload\",\"library\"]}");return;}
         if(!strcmp(path,"/api/cover")){cover_image(sock,url);return;}
         if(!strcmp(path,"/api/catalog-index")){catalog_index(sock,url);return;}
         if(!strcmp(path,"/api/host-games")){host_games(sock,url);return;}
