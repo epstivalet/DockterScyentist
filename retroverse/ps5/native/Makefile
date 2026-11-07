@@ -16,10 +16,10 @@ LIBS := $(SDL_LIBS) $(CURL_LIBS) $(PS5_LIBS) -lm -lz -lbz2 -liconv
 
 .PHONY: all clean
 all: $(ELF)
-../full/assets.inc ../full/catalog_data.inc ../full/archive_data.inc ../full/ca_data.inc:
-	$(MAKE) -C ../full assets.inc catalog_data.inc archive_data.inc ca_data.inc
+../full/assets.inc ../full/catalog_data.inc ../full/verified_sources.inc ../full/ca_data.inc:
+	$(MAKE) -C ../full assets.inc catalog_data.inc verified_sources.inc ca_data.inc
 
-backend.o: ../full/main.c ../full/assets.inc ../full/catalog_data.inc ../full/archive_data.inc
+backend.o: ../full/main.c ../full/assets.inc ../full/catalog_data.inc ../full/verified_sources.inc
 	$(CC) $(CFLAGS) -Dmain=retroverse_web_server_main -c -o $@ ../full/main.c
 
 curl_net.o: ../full/curl_net.c ../full/ca_data.inc ../full/curl_net.h
