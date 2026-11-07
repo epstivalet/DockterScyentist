@@ -1,4 +1,4 @@
-name: Build RetroVerse PS5 Installable Native Store v0.9
+name: Build RetroVerse PS5 Installable Native Store v0.10
 on:
   workflow_dispatch:
   push:
@@ -67,7 +67,7 @@ jobs:
           from pathlib import Path
           path=Path("sce_sys/param.json")
           p=json.loads(path.read_text())
-          p["contentVersion"]="01.000.900"
+          p["contentVersion"]="01.001.000"
           path.write_text(json.dumps(p,indent=2)+"\n")
           PY
           /usr/bin/python3 "$GITHUB_WORKSPACE/retroverse/ps5/home-screen/generate_icon.py" sce_sys/icon0.png
@@ -110,7 +110,7 @@ jobs:
           from pathlib import Path
           import zipfile
           app=Path('PPSA99873')
-          out=Path('RetroVerse-PS5-v0.9-Native-Store.zip')
+          out=Path('RetroVerse-PS5-v0.10-Native-Store.zip')
           with zipfile.ZipFile(out,'w',compression=zipfile.ZIP_DEFLATED,compresslevel=8) as f:
               for p in sorted(app.rglob('*')):
                   if p.is_file():f.write(p,p.as_posix())
@@ -122,12 +122,12 @@ jobs:
               assert needed <= set(f.namelist())
           print(out, out.stat().st_size)
           PY
-          sha256sum RetroVerse-PS5-v0.9-Native-Store.zip > SHA256SUMS
+          sha256sum RetroVerse-PS5-v0.10-Native-Store.zip > SHA256SUMS
       - name: Upload installable RetroVerse native storefront
         uses: actions/upload-artifact@v4
         with:
-          name: RetroVerse-PS5-v0.9-Native-Store
+          name: RetroVerse-PS5-v0.10-Native-Store
           path: |
-            /tmp/rv-native-template/dist/RetroVerse-PS5-v0.9-Native-Store.zip
+            /tmp/rv-native-template/dist/RetroVerse-PS5-v0.10-Native-Store.zip
             /tmp/rv-native-template/dist/SHA256SUMS
           if-no-files-found: error
