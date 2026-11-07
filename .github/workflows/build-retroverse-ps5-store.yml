@@ -31,6 +31,8 @@ jobs:
           Path('/tmp/retroverse-store-ui.js').write_text('\n'.join(scripts))
           PY
           node --check /tmp/retroverse-store-ui.js
+      - name: Test short and oversized magnet links
+        run: node retroverse/ps5/full/test_magnet_ui.cjs
       - name: Validate and retrieve publisher-approved homebrew assets
         run: python3 retroverse/ps5/full/verify_sources.py
       - name: Install pinned PacBrew libcurl and TLS libraries
