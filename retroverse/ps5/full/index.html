@@ -82,10 +82,10 @@ nav button{flex:0 0 auto;white-space:nowrap;font-size:12px;padding:10px 12px}
 </section>
 
 <section id="hosts" class="hidden">
- <div class="row"><h2>AVAILABLE BY HOST</h2><span class="pill">Official homebrew · SHA-256 checked</span></div>
- <p class="subtle">This tab lists original homebrew games from their developers' official GitHub releases, with pinned file sizes and SHA-256 checksums. The larger artwork catalog is for browsing only. External sites are not treated as verified downloads.</p>
+ <div class="row"><h2>AVAILABLE BY HOST</h2><span class="pill">Direct downloads to PS5</span></div>
+ <p class="subtle">Select a console and game, then download directly to your PS5. Official homebrew files have SHA-256 checksums; Archive files are unverified third-party uploads. Only download copies you are authorized to use.</p>
  <div class="actions">
- <select id="hostSelector" aria-label="Select game source"><option value="verified">Official Developer Releases</option><option value="vimm">Vimm's Lair · External only</option></select>
+ <select id="hostSelector" aria-label="Select game source"><option value="verified">Official Developer Releases</option><option value="archive">Internet Archive · Direct downloads</option></select>
  <select id="hostPlatform" aria-label="Select console"></select>
  <button class="secondary" id="hostRefresh">REFRESH FILE LIST</button>
  </div>
@@ -102,9 +102,9 @@ nav button{flex:0 0 auto;white-space:nowrap;font-size:12px;padding:10px 12px}
  <div class="row"><h2>TORRENTS · PS5</h2><span class="pill">Separate PS5Torrent engine</span></div>
  <p class="subtle">Browse external source directories, then paste a magnet link for content you are authorized to download. A directory listing or magnet does not establish redistribution rights or file availability. Torrent downloads remain separate from the verified HTTPS library until reviewed.</p>
  <div class="actions">
- <a class="secondary" href="https://r-roms.github.io/" target="_blank" rel="noopener noreferrer">Roms Megathread · Browse</a>
- <a class="secondary" href="https://r-roms.github.io/General/torrents" target="_blank" rel="noopener noreferrer">Megathread · Torrents</a>
- <a class="secondary" href="https://minerva-archive.org/browse/" target="_blank" rel="noopener noreferrer">MiNERVA · Systems</a>
+ 
+ 
+ 
  <button class="secondary" id="torrentRefresh">REFRESH TORRENTS</button>
  </div>
  <div class="pane"><div class="torrent-row"><strong id="torrentEngine">Checking PS5Torrent service…</strong><span class="torrent-stat">Local PS5 port 12389</span></div>
@@ -123,11 +123,11 @@ nav button{flex:0 0 auto;white-space:nowrap;font-size:12px;padding:10px 12px}
 <div class="detail"><div><img id="detailArt" alt="Game cover"><img id="detailShot" alt="Game screenshot" style="margin-top:14px"></div>
 <div><span class="kicker" id="detailPlatform"></span><h2 id="detailTitle" style="margin:10px 0 12px;font-size:32px"></h2>
 <p class="subtle">Cover and screenshot data: Libretro Thumbnails. Catalog entries do not imply a download is offered or legally distributable.</p>
-<button class="primary" id="findDownload">CHECK OFFICIAL SOURCES</button><p id="sourceStatus" class="subtle"></p><div id="sourceMatches"></div>
+<button class="primary" id="findDownload">CHECK AVAILABLE DOWNLOADS</button><p id="sourceStatus" class="subtle"></p><div id="sourceMatches"></div>
 <div class="source"><span>Add an authorized copy you already have</span><button id="importThis">UPLOAD FILE</button></div>
-<div class="source"><span>Open Vimm's Lair manually (external site)</span><button id="openVimm">OPEN</button></div>
+
 </div></div></dialog>
-<footer>RetroVerse PS5 v0.10 · CoinOPS visual theme assets © respective contributors, CC BY-NC-SA 2.0 · <a href="https://github.com/nazdir/coinops-modified" target="_blank" rel="noopener">Theme credits</a> · Libretro thumbnails © respective rightsholders · Homebrew test, not a commercial store</footer>
+<footer>RetroVerse PS5 v0.11 · CoinOPS visual theme assets © respective contributors, CC BY-NC-SA 2.0 · Theme credits: nazdir/coinops-modified · Libretro thumbnails © respective rightsholders · Homebrew test, not a commercial store</footer>
 <script>
 'use strict';
 var SYSTEMS=[
@@ -219,23 +219,23 @@ function showDetails(g){
  var selectedSystem=SYSTEMS.find(function(x){return x[0]===g.platform})||sys();
  el('detailPlatform').textContent=selectedSystem[1]+' · '+(g.region||'REGION UNSPECIFIED');
  el('detailArt').src=getArt(g,'Named_Boxarts');el('detailShot').src=getArt(g,'Named_Snaps');
- el('sourceStatus').textContent='Only approved developer releases are downloadable here; the artwork catalog does not guarantee a game download.';
+ el('sourceStatus').textContent='Check indexed verified developer releases and Archive files. Archive files are not checksum verified.';
  el('sourceMatches').replaceChildren();el('detailDialog').showModal();
 }
 async function findSources(){
  var g=current;if(!g)return;
- el('sourceStatus').textContent='Checking approved developer releases for '+g.title+'…';
+ el('sourceStatus').textContent='Checking direct download sources for '+g.title+'…';
  el('sourceMatches').replaceChildren();
  try{
   var res=await get('/api/curated/matches?platform='+enc(g.platform)+'&title='+enc(g.title));
   if(current!==g)return;
-  el('sourceStatus').textContent=res.supported?(res.files.length+' verified original homebrew releases found.'):'No verified sources are configured for this console.';
+  el('sourceStatus').textContent=res.supported?(res.files.length+' matching downloads found.'):'No direct source is configured for this console.';
   res.files.forEach(function(f){
    var line=document.createElement('div');line.className='source';var desc=document.createElement('span');desc.textContent=f.display_name;
    var b=document.createElement('button');b.textContent='DOWNLOAD ↓';b.onclick=async function(){
     if(!confirm('Download '+f.display_name+' to PS5 local storage?\nOnly continue if you have permission to use this copy.'))return;
     b.disabled=true;
-    try{await get('/api/curated/download',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({platform:g.platform,filename:f.filename,title:g.title,rights_confirmed:true})});el('detailDialog').close();tab('downloads');loadJobs()}catch(e){alert('Download could not start: '+e.message);b.disabled=false}
+    try{await get('/api/curated/download',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({platform:g.platform,filename:f.filename,title:g.title,origin:f.source_kind||"verified",rights_confirmed:true})});el('detailDialog').close();tab('downloads');loadJobs()}catch(e){alert('Download could not start: '+e.message);b.disabled=false}
    };
    line.append(desc,b);el('sourceMatches').appendChild(line)
   });
@@ -274,20 +274,18 @@ function hostGameTitle(f){return String(f.title||'').trim()}
 async function loadHostGames(){
  var source=el('hostSelector').value,p=el('hostPlatform').value,token=++hostLoadToken;
  el('hostCards').replaceChildren();
- el('hostHeading').textContent=source==='verified'?'Official Homebrew · '+p+' · '+hostLetter:'Vimm’s Lair';
- if(source!=='verified'){
-  hostEntries=[];el('hostInfo').textContent='Vimm’s Lair has not provided a verified public direct-file index. Its game pages can be browsed externally, but no downloads are claimed.';
-  var a=document.createElement('a');a.href='https://vimm.net/vault';a.target='_blank';a.rel='noopener noreferrer';a.textContent='Open Vimm’s Vault';
-  el('hostCards').appendChild(a);return;
+ el('hostHeading').textContent=(source==='archive'?'Internet Archive':'Official Homebrew')+' · '+p+' · '+hostLetter;
+ if(source==='archive'&&p!=='GC'&&p!=='SNES'){
+  hostEntries=[];el('hostInfo').textContent='Archive downloads are configured for GameCube and SNES. Select one of these consoles.';return;
  }
- el('hostInfo').textContent='Loading approved homebrew releases for '+p+'…';
+ el('hostInfo').textContent='Loading '+(source==='archive'?'Archive index':'verified releases')+' for '+p+'…';
  try{
-  var data=await get('/api/host-games?host=verified&platform='+enc(p)+'&letter='+enc(hostLetter));
+  var data=await get('/api/host-games?host='+enc(source)+'&platform='+enc(p)+'&letter='+enc(hostLetter));
   if(token!==hostLoadToken)return;
   hostEntries=data.games||[];
-  el('hostInfo').textContent=data.indexed?
-    hostEntries.length+' pinned developer releases for '+p+' under '+hostLetter+'. Downloaded bytes will be verified on the PS5.':
-    'No approved direct downloads for this console. You can still import your own files in MY LIBRARY.';
+  el('hostInfo').textContent=source==='archive'?
+   (hostEntries.length+' files under '+hostLetter+'. Direct PS5 download; files are not checksum verified.'):
+   (hostEntries.length+' verified homebrew releases under '+hostLetter+'. SHA-256 checked after transfer.');
   renderHostCards();
  }catch(e){if(token===hostLoadToken)el('hostInfo').textContent='Host index error: '+e.message}
 }
@@ -302,7 +300,7 @@ function renderHostCards(){
   var img=document.createElement('img');img.loading='lazy';img.alt='Artwork for '+e.title;img.src=getArt(g,'Named_Boxarts');
   img.onerror=function(){img.onerror=null;img.style.visibility='hidden'};
   var label=document.createElement('strong');label.textContent=e.title;
-  var small=document.createElement('small');small.textContent='OFFICIAL RELEASE · OPEN';
+  var small=document.createElement('small');small.textContent=e.source_kind==='archive'?'ARCHIVE · DOWNLOAD':'OFFICIAL RELEASE · DOWNLOAD';
   b.append(img,label,small);b.onclick=function(){showDetails(g);appendHostFile(e)};
   root.appendChild(b);
  });
@@ -310,22 +308,20 @@ function renderHostCards(){
 function appendHostFile(e){
  var root=el('sourceMatches');root.replaceChildren();
  var line=document.createElement('div');line.className='source';
- var info=document.createElement('span');info.textContent='Developer release: '+e.title+' · '+(e.size||0)+' bytes · SHA-256 verified';
+ var isArchive=e.source_kind==='archive';
+ var info=document.createElement('span');info.textContent=(isArchive?'Archive / unverified: ':'Developer / SHA-256 verified: ')+e.filename;
  var b=document.createElement('button');b.textContent='DOWNLOAD TO PS5';
  b.onclick=async function(){
-  if(!confirm('Download the original homebrew game '+e.title+' to your PS5?'))return;
+  if(!confirm('Download '+e.filename+' directly to your PS5?\nConfirm you have permission to make this copy.'))return;
   b.disabled=true;
   try{
    await get('/api/curated/download',{method:'POST',headers:{'Content-Type':'application/json'},
-     body:JSON.stringify({platform:e.platform,filename:e.filename,title:e.title,rights_confirmed:true})});
+      body:JSON.stringify({platform:e.platform,filename:e.filename,title:e.title,origin:e.source_kind||'verified',rights_confirmed:true})});
    el('detailDialog').close();tab('downloads');loadJobs();
   }catch(err){alert('Download could not start: '+err.message);b.disabled=false}
  };
- var open=document.createElement('a');
- open.href=e.source_page;
-  open.target='_blank';open.rel='noopener noreferrer';open.textContent='VIEW OFFICIAL RELEASE';
-  line.append(info,b,open);root.appendChild(line);
- el('sourceStatus').textContent='This original homebrew game is pinned to the developer release and checked with SHA-256 after transfer. If the source becomes unavailable, RetroVerse reports the error and leaves no corrupted file.';
+ line.append(info,b);root.appendChild(line);
+ el('sourceStatus').textContent=isArchive?'Direct Archive HTTPS transfer to PS5; no trusted checksum available.':'Direct SHA-256-verified transfer to PS5.';
 }
 async function diag(kind){
  var btn=el(kind==='storage'?'storageCheck':kind==='curl'?'curlCheck':'networkCheck');
@@ -495,9 +491,8 @@ el('gameDetails').onclick=function(){if(shown[selected])showDetails(shown[select
 el('closeDetail').onclick=function(){el('detailDialog').close()};
 el('findDownload').onclick=findSources;
 el('importThis').onclick=function(){el('detailDialog').close();tab('library');el('uploadPlatform').value=platform;el('uploadFile').click()};
-el('openVimm').onclick=function(){window.open('https://vimm.net/vault','_blank','noopener,noreferrer')};
 el('uploadButton').onclick=uploadGame;el('refreshLibrary').onclick=loadLibrary;el('refreshJobs').onclick=loadJobs;
-el('hostSelector').onchange=loadHostGames;
+el('hostSelector').onchange=function(){hostLetter='A';if(el('hostSelector').value==='archive')el('hostPlatform').value='GC';renderHostLetters();loadHostGames()};
 el('hostPlatform').onchange=function(){hostLetter='A';renderHostLetters();loadHostGames()};
 el('hostRefresh').onclick=loadHostGames;
 el('hostFilter').oninput=renderHostCards;
