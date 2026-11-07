@@ -35,6 +35,8 @@ jobs:
         run: |
           grep -q 'SDL_CONTROLLERBUTTONDOWN' retroverse/ps5/native/main.c
           grep -q 'SDL_CreateRenderer' retroverse/ps5/native/main.c
+      - name: Validate developer release source manifest
+        run: python3 retroverse/ps5/full/verified_source_build.py
       - name: Build SDL2 native PS5 ELF
         env:
           PS5_PAYLOAD_SDK: /opt/ps5-payload-sdk
