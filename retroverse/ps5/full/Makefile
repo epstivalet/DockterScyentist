@@ -21,6 +21,8 @@ archive_data.inc: archive_catalog_build.py
 	python3 archive_catalog_build.py
 verified_sources.inc: verified_source_build.py verified_sources.json
 	python3 verified_source_build.py
+archive_sources.inc: archive_source_build.py
+	python3 archive_source_build.py
 ca_data.inc: embed_ca.py
 	python3 embed_ca.py
 $(ELF): main.c curl_net.c torrent_bridge.c torrent_bridge.h curl_net.h assets.inc catalog_data.inc archive_data.inc verified_sources.inc ca_data.inc
@@ -28,4 +30,4 @@ $(ELF): main.c curl_net.c torrent_bridge.c torrent_bridge.h curl_net.h assets.in
 test: $(ELF)
 	$(PS5_DEPLOY) -h $(PS5_HOST) -p $(PS5_PORT) $(ELF)
 clean:
-	rm -f $(ELF) assets.inc catalog_data.inc archive_data.inc ca_data.inc
+	rm -f $(ELF) assets.inc catalog_data.inc verified_sources.inc archive_sources.inc ca_data.inc
