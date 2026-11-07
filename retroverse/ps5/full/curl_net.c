@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <sys/stat.h>
 #include <unistd.h>
 #include "curl_net.h"
@@ -87,11 +88,12 @@ static CURL *new_curl(const char *url,char *err,size_t errlen,char *errorbuf){
     if(!curl){snprintf(err,errlen,"curl_easy_init failed");return NULL;}
     curl_easy_setopt(curl,CURLOPT_ERRORBUFFER,errorbuf);
     curl_easy_setopt(curl,CURLOPT_URL,url);
-    curl_easy_setopt(curl,CURLOPT_USERAGENT,"RetroVerse-PS5/0.6");
+    curl_easy_setopt(curl,CURLOPT_USERAGENT,"RetroVerse-PS5/0.9");
     curl_easy_setopt(curl,CURLOPT_CAINFO,RV_CA_FILE);
     curl_easy_setopt(curl,CURLOPT_SSL_VERIFYPEER,1L);
     curl_easy_setopt(curl,CURLOPT_SSL_VERIFYHOST,2L);
     curl_easy_setopt(curl,CURLOPT_FOLLOWLOCATION,1L);
+    curl_easy_setopt(curl,CURLOPT_FAILONERROR,1L);
     curl_easy_setopt(curl,CURLOPT_MAXREDIRS,6L);
     curl_easy_setopt(curl,CURLOPT_CONNECTTIMEOUT,15L);
     curl_easy_setopt(curl,CURLOPT_TIMEOUT,90L);
@@ -145,13 +147,20 @@ int rv_https_download(const char *url,FILE *destination,uint64_t max,
     curl_easy_setopt(curl,CURLOPT_TIMEOUT,0L);
     curl_easy_setopt(curl,CURLOPT_LOW_SPEED_LIMIT,200L);
     curl_easy_setopt(curl,CURLOPT_LOW_SPEED_TIME,45L);
+    curl_easy_setopt(curl,CURLOPT_MAXFILESIZE_LARGE,(curl_off_t)max);
     CURLcode rc=curl_easy_perform(curl);
     long status=0;curl_easy_getinfo(curl,CURLINFO_RESPONSE_CODE,&status);
-    int fail=(rc!=CURLE_OK || status!=200 || sink.io_error || sink.over_limit);
+    char *ctype=NULL;
+    curl_easy_getinfo(curl,CURLINFO_CONTENT_TYPE,&ctype);
+    int is_web_page=ctype && (!strncasecmp(ctype,"text/html",9)||
+                              !strncasecmp(ctype,"application/json",16)||
+                              !strncasecmp(ctype,"text/plain",10));
+    int fail=(rc!=CURLE_OK || status!=200 || sink.io_error || sink.over_limit || is_web_page);
     if(fail){
         if(*cancel)snprintf(err,errlen,"Canceled by user");
         else if(sink.io_error)snprintf(err,errlen,"Disk write failed: %s",strerror(sink.io_error));
         else if(sink.over_limit)snprintf(err,errlen,"Download exceeds configured size limit");
+        else if(is_web_page)snprintf(err,errlen,"Source returned a web page instead of a game file");
         else set_error(err,errlen,"Download",rc,details,status);
     }
     curl_easy_cleanup(curl);
