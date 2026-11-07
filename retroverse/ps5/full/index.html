@@ -3,7 +3,7 @@
 <title>RetroVerse PS5 · CoinOPS Store</title><style>
 :root{--accent:#ab99ff;--bg:#090e1d;--text:#ecf0ff;--muted:#bac3da}
 *{box-sizing:border-box}body{margin:0;background:#080c15;color:var(--text);font:16px system-ui,'Segoe UI',sans-serif}
-button,input,select{font:inherit}button{cursor:pointer}a{color:#abcaff}button:focus-visible,a:focus-visible{outline:3px solid white;outline-offset:3px}
+button,input,select,textarea{font:inherit}button{cursor:pointer}a{color:#abcaff}button:focus-visible,a:focus-visible{outline:3px solid white;outline-offset:3px}
 header{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:17px 3.5%;background:#080d1bdc;border-bottom:1px solid #ffffff22;position:sticky;top:0;z-index:6;backdrop-filter:blur(15px)}
 .brand{font-size:26px;font-weight:900;letter-spacing:-.06em}.brand b{color:var(--accent)}.status{font-size:12px;letter-spacing:.09em;color:#8eeda9}
 nav{display:flex;gap:6px}nav button,.tab{background:#ffffff10;color:#dfe6f6;border:1px solid #ffffff22;border-radius:10px;padding:10px 15px}nav button.active,.tab.active{background:var(--accent);color:#11101e;font-weight:800}
@@ -29,7 +29,8 @@ nav{display:flex;gap:6px}nav button,.tab{background:#ffffff10;color:#dfe6f6;bord
 .subtle{color:var(--muted);line-height:1.55;font-size:14px}.row{display:flex;justify-content:space-between;gap:14px;align-items:center;flex-wrap:wrap;margin:28px 0 15px}
 h2{margin:0;font-size:25px}.letters{display:flex;flex-wrap:wrap;gap:5px;margin:16px 0}.letters button{min-width:33px;padding:8px;border:1px solid #ffffff26;background:#ffffff12;color:white;border-radius:5px}
 .letters button.active{background:var(--accent);color:#080b14;font-weight:900}
-input,select{padding:12px 13px;background:#171c30;color:white;border:1px solid #ffffff35;border-radius:10px}
+input,select,textarea{padding:12px 13px;background:#171c30;color:white;border:1px solid #ffffff35;border-radius:10px}
+textarea{display:block;width:100%;resize:vertical;min-height:100px;overflow-wrap:anywhere}.torrent-row{display:flex;gap:12px;flex-wrap:wrap;justify-content:space-between;align-items:center}.torrent-row strong{overflow-wrap:anywhere}.torrent-stat{font-size:13px;color:var(--muted)}
 .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px}.game{background:#ffffff0c;border:1px solid #ffffff18;color:white;border-radius:12px;overflow:hidden;text-align:left;padding:0}
 .game img{display:block;width:100%;height:200px;object-fit:contain;background:radial-gradient(#212b48,#080b17);padding:8px}.game strong{display:block;padding:9px 10px;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;font-size:13px}.game small{display:block;padding:0 10px 10px;color:var(--muted)}
 .pane{border:1px solid #ffffff1d;border-radius:14px;background:#131b2d;padding:20px;margin-top:15px}
@@ -67,7 +68,7 @@ nav button{flex:0 0 auto;white-space:nowrap;font-size:12px;padding:10px 12px}
 }
 </style></head><body>
 <header><span class="brand">RETRO<b>VERSE</b> <small style="font-size:11px;letter-spacing:.1em">PS5</small></span>
-<nav><button class="tab active" data-tab="store">STORE</button><button class="tab" data-tab="hosts">HOSTS</button><button class="tab" data-tab="library">MY LIBRARY</button><button class="tab" data-tab="downloads">DOWNLOADS</button></nav>
+<nav><button class="tab active" data-tab="store">STORE</button><button class="tab" data-tab="hosts">HOSTS</button><button class="tab" data-tab="library">MY LIBRARY</button><button class="tab" data-tab="downloads">DOWNLOADS</button><button class="tab" data-tab="torrents">TORRENTS</button></nav>
 <span class="status" id="connection">CONNECTING…</span></header>
 <main class="wrap">
 <section id="store">
@@ -97,6 +98,26 @@ nav button{flex:0 0 auto;white-space:nowrap;font-size:12px;padding:10px 12px}
 <div class="actions"><button class="primary" id="refreshLibrary">REFRESH</button><select id="uploadPlatform"></select><input type="file" id="uploadFile" aria-label="Choose authorized game file"><button class="secondary" id="uploadButton">UPLOAD FROM PC / PHONE</button></div>
 <p class="subtle" id="uploadState"></p><div class="pane" id="libraryList">Loading…</div></section>
 <section id="downloads" class="hidden"><h2>DOWNLOAD MANAGER</h2><p class="subtle">Downloads are written directly by the PS5 payload to its RetroVerse library. Only download content you are authorized to use.</p><div class="actions"><button class="primary" id="storageCheck">1. TEST PS5 STORAGE</button><button class="primary" id="networkCheck">3. TEST NATIVE HTTPS</button><button class="primary" id="curlCheck">2. TEST SECURE CURL</button><button class="secondary" id="testDownload">4. FULL FILE TEST</button><button class="secondary" id="refreshJobs">REFRESH STATUS</button></div><p class="subtle">These checks isolate local storage, the new verified-certificate HTTPS transport, and the original PS5 HTTPS client. Test 4 downloads a small original, freely distributed homebrew ROM from its developer, checks its SHA-256 on the PS5, and deletes the test file.</p><div class="pane" id="diagnosticResults" style="white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word">Run storage and HTTPS tests first.</div><p class="subtle" id="testResult"></p><div class="pane" id="jobs">No downloads yet.</div></section>
+<section id="torrents" class="hidden">
+ <div class="row"><h2>TORRENTS · PS5</h2><span class="pill">Separate PS5Torrent engine</span></div>
+ <p class="subtle">Browse external source directories, then paste a magnet link for content you are authorized to download. A directory listing or magnet does not establish redistribution rights or file availability. Torrent downloads remain separate from the verified HTTPS library until reviewed.</p>
+ <div class="actions">
+ <a class="secondary" href="https://r-roms.github.io/" target="_blank" rel="noopener noreferrer">Roms Megathread · Browse</a>
+ <a class="secondary" href="https://r-roms.github.io/roms/torrents/" target="_blank" rel="noopener noreferrer">Megathread · Torrents</a>
+ <a class="secondary" href="https://minerva-archive.org/browse/" target="_blank" rel="noopener noreferrer">MiNERVA · Systems</a>
+ <button class="secondary" id="torrentRefresh">REFRESH TORRENTS</button>
+ </div>
+ <div class="pane"><div class="torrent-row"><strong id="torrentEngine">Checking PS5Torrent service…</strong><span class="torrent-stat">Local PS5 port 12389</span></div>
+ <p class="subtle">The separately installed PS5Torrent ELF must be running on the same console. RetroVerse connects to it through local loopback. Torrent transfers are stored under /data/retroverse/torrents/torrents/, not automatically imported into MY LIBRARY.</p></div>
+ <div class="pane">
+ <label for="torrentMagnet"><strong>MAGNET LINK</strong></label>
+ <textarea id="torrentMagnet" spellcheck="false" placeholder="magnet:?xt=urn:btih:..."></textarea>
+ <div class="actions"><button class="primary" id="torrentAdd">START TORRENT DOWNLOAD</button><button class="secondary" id="torrentClear">CLEAR</button></div>
+ <p class="subtle" id="torrentMessage" aria-live="polite">Only manually provided magnet links are accepted. Downloads may require peers and take time to fetch metadata.</p>
+ </div>
+ <div class="row"><h2>TORRENT QUEUE</h2><span class="subtle">Refresh to update peers and transfer speed</span></div>
+ <div class="pane" id="torrentJobs">No torrent data yet.</div>
+</section>
 </main>
 <dialog id="detailDialog" class="modal"><button class="secondary" id="closeDetail" style="float:right">✕ CLOSE</button>
 <div class="detail"><div><img id="detailArt" alt="Game cover"><img id="detailShot" alt="Game screenshot" style="margin-top:14px"></div>
@@ -106,7 +127,7 @@ nav button{flex:0 0 auto;white-space:nowrap;font-size:12px;padding:10px 12px}
 <div class="source"><span>Add an authorized copy you already have</span><button id="importThis">UPLOAD FILE</button></div>
 <div class="source"><span>Open Vimm's Lair manually (external site)</span><button id="openVimm">OPEN</button></div>
 </div></div></dialog>
-<footer>RetroVerse PS5 v0.9 · CoinOPS visual theme assets © respective contributors, CC BY-NC-SA 2.0 · <a href="https://github.com/nazdir/coinops-modified" target="_blank" rel="noopener">Theme credits</a> · Libretro thumbnails © respective rightsholders · Homebrew test, not a commercial store</footer>
+<footer>RetroVerse PS5 v0.10 · CoinOPS visual theme assets © respective contributors, CC BY-NC-SA 2.0 · <a href="https://github.com/nazdir/coinops-modified" target="_blank" rel="noopener">Theme credits</a> · Libretro thumbnails © respective rightsholders · Homebrew test, not a commercial store</footer>
 <script>
 'use strict';
 var SYSTEMS=[
@@ -221,9 +242,9 @@ async function findSources(){
  }catch(e){el('sourceStatus').textContent='Source lookup unavailable: '+e.message}
 }
 function tab(name){
- ['store','hosts','library','downloads'].forEach(function(n){el(n).classList.toggle('hidden',n!==name)});
+ ['store','hosts','library','downloads','torrents'].forEach(function(n){el(n).classList.toggle('hidden',n!==name)});
  document.querySelectorAll('nav .tab').forEach(function(b){b.classList.toggle('active',b.dataset.tab===name)});
- if(name==='library')loadLibrary();if(name==='downloads')loadJobs();if(name==='hosts')loadHostGames();
+ if(name==='library')loadLibrary();if(name==='downloads')loadJobs();if(name==='hosts')loadHostGames();if(name==='torrents')loadTorrents();
 }
 async function loadLibrary(){
  try{var x=await get('/api/library');var box=el('libraryList');box.replaceChildren();
@@ -348,6 +369,80 @@ async function loadJobs(){
   });
  }catch(e){el('jobs').textContent='Status error: '+e.message}
 }
+
+var torrentWorking=false;
+function torrentBytes(n){
+ n=Number(n)||0;
+ if(n>=1073741824)return (n/1073741824).toFixed(2)+' GiB';
+ if(n>=1048576)return (n/1048576).toFixed(1)+' MiB';
+ if(n>=1024)return (n/1024).toFixed(0)+' KiB';
+ return n+' B';
+}
+async function loadTorrents(){
+ var panel=el('torrentJobs');
+ try{
+  var x=await get('/api/torrent/status');
+  el('torrentEngine').textContent='PS5TORRENT CONNECTED · '+(x.version||'service active');
+ }catch(e){
+  el('torrentEngine').textContent='PS5TORRENT OFFLINE · Start PS5Torrent.elf';
+  panel.textContent='Torrent engine unavailable: '+e.message+'. The HTTPS store remains available.';
+  return;
+ }
+ try{
+  var r=await get('/api/torrent/list'),jobs=r.torrents||[];
+  panel.replaceChildren();
+  if(!jobs.length){panel.textContent='No torrents in the queue.';return;}
+  jobs.forEach(function(t){
+   var box=document.createElement('div');box.className='file';
+   var body=document.createElement('div');body.style.flex='1';
+   var title=document.createElement('strong');title.textContent=t.name||'Unnamed torrent';
+   var progress=Number(t.progress)||0;
+   // PS5Torrent uses percent progress in a number from 0 to 100.
+   if(progress>=0&&progress<=1&&Number(t.downloaded)>0&&Number(t.size)>0)progress=100*Number(t.downloaded)/Number(t.size);
+   if(progress>100)progress=100;if(progress<0)progress=0;
+   var meta=document.createElement('div');meta.className='torrent-stat';
+   meta.textContent=String(t.state||'unknown').toUpperCase()+' · '+progress.toFixed(1)+'% · '+torrentBytes(t.downloaded)+' / '+torrentBytes(t.size)+' · '+torrentBytes(t.speed_down)+'/s · '+(t.peers||0)+' peers';
+   var bar=document.createElement('div');bar.className='progress';var fill=document.createElement('div');fill.style.width=progress+'%';bar.appendChild(fill);
+   body.append(title,meta,bar);
+   if(t.error){var issue=document.createElement('p');issue.className='subtle';issue.textContent='Status: '+t.error;body.appendChild(issue);}
+   var actions=document.createElement('div');actions.className='actions';
+   ['start','stop','remove'].forEach(function(action){
+    var btn=document.createElement('button');btn.className='secondary';btn.textContent=action==='start'?'RESUME':action==='stop'?'PAUSE':'REMOVE';
+    btn.onclick=async function(){
+     if(action==='remove'&&!confirm('Remove torrent '+(t.name||'')+' from the active queue?'))return;
+     btn.disabled=true;
+     try{
+      await get('/api/torrent/action',{method:'POST',headers:{'Content-Type':'application/json'},
+       body:JSON.stringify({id:String(t.id),action:action})});
+      loadTorrents();
+     }catch(e){el('torrentMessage').textContent='Torrent command failed: '+e.message;btn.disabled=false}
+    };
+    actions.appendChild(btn);
+   });
+   box.append(body,actions);panel.appendChild(box);
+  });
+ }catch(e){panel.textContent='Torrent queue unavailable: '+e.message;}
+}
+async function addMagnet(){
+ if(torrentWorking)return;
+ var magnet=el('torrentMagnet').value.trim();
+ if(!magnet.startsWith('magnet:?')||!(/xt=urn:btih:|xt=urn:btmh:/i).test(magnet)){
+  el('torrentMessage').textContent='Paste a valid magnet URI with a BitTorrent info hash.';return;
+ }
+ if(magnet.length>1800){el('torrentMessage').textContent='Magnet URI is too long (maximum 1800 characters).';return;}
+ if(!confirm('Start this torrent on your PS5? Confirm you have permission to download and share its files with other peers.'))return;
+ torrentWorking=true;el('torrentAdd').disabled=true;
+ el('torrentMessage').textContent='Submitting magnet to the local PS5Torrent service…';
+ try{
+  var r=await get('/api/torrent/add',{method:'POST',headers:{'Content-Type':'application/json'},
+   body:JSON.stringify({magnet:magnet,rights_confirmed:true})});
+  el('torrentMessage').textContent='Added: '+(r.name||'Torrent')+'. File retrieval depends on available peers.';
+  el('torrentMagnet').value='';
+  loadTorrents();
+ }catch(e){el('torrentMessage').textContent='Could not start torrent: '+e.message}
+ torrentWorking=false;el('torrentAdd').disabled=false;
+}
+
 document.querySelectorAll('nav .tab').forEach(function(b){b.onclick=function(){tab(b.dataset.tab)}});
 el('filter').oninput=draw;el('prev').onclick=function(){step(-1)};el('next').onclick=function(){step(1)};
 el('gameDetails').onclick=function(){if(shown[selected])showDetails(shown[selected])};
@@ -364,6 +459,7 @@ el('storageCheck').onclick=function(){diag('storage')};
 el('networkCheck').onclick=function(){diag('network')};
 el('curlCheck').onclick=function(){diag('curl')};
 el('testDownload').onclick=checkDownloadPipeline;
+el('torrentRefresh').onclick=loadTorrents;el('torrentAdd').onclick=addMagnet;el('torrentClear').onclick=function(){el('torrentMagnet').value=''};
 el('hostPlatform').innerHTML=SYSTEMS.map(function(s){return '<option value="'+s[0]+'">'+s[1]+'</option>'}).join('');
 renderHostLetters();
 
@@ -381,4 +477,5 @@ function padLoop(){var gp=navigator.getGamepads&&navigator.getGamepads()[0];if(g
 renderSystems();theme();renderLetters();loadCatalog();
 get('/api/health').then(function(x){el('connection').textContent=x.ok?'● PS5 ELF CONNECTED':'OFFLINE'}).catch(function(){el('connection').textContent='● OFFLINE'});
 setInterval(function(){if(!el('downloads').classList.contains('hidden'))loadJobs()},1600);
+setInterval(function(){if(!el('torrents').classList.contains('hidden'))loadTorrents()},5000);
 </script></body></html>
