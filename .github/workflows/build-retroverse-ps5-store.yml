@@ -43,6 +43,8 @@ jobs:
           sudo tar -xzf /tmp/pacbrew.tar.gz -C / opt/ps5-payload-sdk/target/user
           /opt/ps5-payload-sdk/bin/prospero-pkg-config --cflags libcurl
           /opt/ps5-payload-sdk/bin/prospero-pkg-config --static --libs libcurl
+      - name: Scrape Internet Archive item file metadata (no game downloads)
+        run: python3 retroverse/ps5/full/archive_source_build.py
       - name: Build store ELF
         env:
           PS5_PAYLOAD_SDK: /opt/ps5-payload-sdk
