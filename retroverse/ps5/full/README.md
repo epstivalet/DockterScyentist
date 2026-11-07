@@ -49,3 +49,25 @@ retrying large files until investigated.
 **Status:** GitHub compile is a build-level check. HTTPS and downloads still
 require testing on the user's actual PS5. No automatic fallback disables TLS
 certificate validation.
+
+
+## v0.10 experimental torrent bridge
+
+The web STORE page now includes a TORRENTS tab, links to the Roms Megathread and
+MiNERVA browse directories, and manual magnet-link entry. Browsing does not
+establish permission to copy files. The app never automatically scrapes, mirrors,
+or imports third-party ROM collections.
+
+Torrent transfers are performed **only** by the separately installed, GPL-3.0
+PS5Torrent project: https://github.com/Phoenixx1202/PS5Torrent (v2 API).
+Launch PS5Torrent.elf first on the same jailbroken PS5. Its HTTP API listens at
+127.0.0.1:12389; RetroVerse proxies a small, fixed set of routes through its
+own server on port 8765. RetroVerse's TLS-verified HTTPS game downloader remains
+independent and unchanged. Torrents are saved under /data/retroverse/torrents/,
+not merged automatically into /data/retroverse/roms/. The native TV title shows
+queue state and points users to the RetroVerse web page to paste magnets.
+
+Start and cancel operations should be used only for files one has permission to
+download and share. BitTorrent may publicly expose a user's IP to peers. Keep
+the unauthenticated RetroVerse LAN service off public networks. The integration
+requires an on-console test and does not bundle or launch PS5Torrent itself.
