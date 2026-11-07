@@ -22,14 +22,17 @@ all: $(ELF)
 backend.o: ../full/main.c ../full/assets.inc ../full/catalog_data.inc ../full/verified_sources.inc
 	$(CC) $(CFLAGS) -Dmain=retroverse_web_server_main -c -o $@ ../full/main.c
 
+torrent_bridge.o: ../full/torrent_bridge.c ../full/torrent_bridge.h
+	$(CC) $(CFLAGS) -c -o $@ ../full/torrent_bridge.c
+
 curl_net.o: ../full/curl_net.c ../full/ca_data.inc ../full/curl_net.h
 	$(CC) $(CFLAGS) -c -o $@ ../full/curl_net.c
 
 ui.o: main.c ../full/curl_net.h
 	$(CC) $(CFLAGS) -c -o $@ main.c
 
-$(ELF): backend.o curl_net.o ui.o
+$(ELF): backend.o curl_net.o torrent_bridge.o ui.o
 	$(CC) $(CFLAGS) -o $@ ui.o backend.o curl_net.o $(LIBS)
 
 clean:
-	rm -f $(ELF) backend.o curl_net.o ui.o
+	rm -f $(ELF) backend.o curl_net.o torrent_bridge.o ui.o
