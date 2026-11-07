@@ -95,9 +95,9 @@ constexpr int maxgames=8000;
 struct Game {char title[190];char original[250];char source[520];};
 static Game *games=nullptr;
 static int ngames=0,system_index=0,tab=0,letter='A',highlight=0;
-static bool dialog=false,helper=false,already_autostarted=false,loading_art=false,cover_attempted=false;
+static bool dialog=false,helper=false,loading_art=false,cover_attempted=false;
 static int pad=-1;
-static char status[600]="RETROVERSE v0.9 NATIVE STORE LOADING";
+static char status[600]="RETROVERSE v0.10.1 NATIVE STORE LOADING";
 static char transfer[520]="NO TRANSFER ACTIVE";
 static char torrent_line[520]="TORRENT ENGINE NOT CHECKED";
 static char selected_source[700]="";
@@ -587,12 +587,12 @@ extern "C" bool retroverse_process_input(){
   load_games();
   if(!input_ready)std::snprintf(status,sizeof status,
          "NATIVE VIDEO READY / DUALSENSE MODULE DID NOT LOAD");
+  // Attach to the working Store ELF; do not start another process at boot.
   helper=helper_status();
-  if(!helper&&!already_autostarted){
-   already_autostarted=true;
-   bool sent=launch_helper();
-   std::snprintf(status,sizeof status,sent?"DOWNLOADER START REQUESTED / CHECKING CONNECTION":"HELPER OFFLINE / LOAD RETROVERSE PAYLOAD IF REQUIRED");
-  }
+  if(helper)std::snprintf(status,sizeof status,
+       "NATIVE VIDEO READY / RETROVERSE STORE ELF CONNECTED");
+  else std::snprintf(status,sizeof status,
+       "NATIVE VIDEO READY / LOAD STORE ELF ON PORT 8765");
   return true;
  }
  bool changed=false;
@@ -615,7 +615,6 @@ extern "C" bool retroverse_process_input(){
  return changed;
 }
 int main(){
- // Reaching this notification confirms executable linking and startup worked.
- notify("RetroVerse v0.10 booted / initializing native TV");
- ps5::demo::run(draw,"RetroVerse v0.10 native storefront displaying");
+ // Known working VideoOut startup order: notification follows the first flip.
+ ps5::demo::run(draw,"RetroVerse v0.10.1 native video initialized");
 }
