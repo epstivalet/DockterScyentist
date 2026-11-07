@@ -648,6 +648,58 @@ static void curated_matches(int sock,const char *url){
     snprintf(body+used,sizeof body-used,"]}");
     json(sock,200,body);
 }
+/* The verified metadata catalog can contain thousands of PS1 tracks.
+ * A bounded, searchable, paginated endpoint avoids huge PS5 RAM responses. */
+static void archive_index_results(int sock,const char *url,const char *host){
+    const char *platform=!strcmp(host,"archive-ps1")?"PS1":"GC";
+    char letter[10]={0},pagebuf[16]={0},search[120]={0},requested[20]={0};
+    param(url,"platform",requested,sizeof requested);
+    param(url,"letter",letter,sizeof letter);
+    param(url,"page",pagebuf,sizeof pagebuf);
+    param(url,"query",search,sizeof search);
+    if(strcmp(requested,platform)){error(sock,400,"Console does not match archive directory");return;}
+    unsigned page=0;
+    for(size_t i=0;pagebuf[i];i++)if(!isdigit((unsigned char)pagebuf[i])){
+        error(sock,400,"Invalid page");return;
+    }
+    if(pagebuf[0]){
+        unsigned long n=strtoul(pagebuf,NULL,10);
+        if(n>1000){error(sock,400,"Page index too large");return;}
+        page=(unsigned)n;
+    }
+    const unsigned per_page=24,offset=page*per_page;
+    char body[36000];
+    size_t used=(size_t)snprintf(body,sizeof body,
+      "{\"host\":\"%s\",\"indexed\":true,\"platform\":\"%s\",\"page\":%u,\"page_size\":%u,\"games\":[",
+      host,platform,page,per_page);
+    unsigned total=0,count=0;
+    for(size_t i=0;i<archive_sources_count;i++){
+        const archive_source_t *src=&archive_sources[i];
+        if(strcmp(platform,src->platform))continue;
+        unsigned char first=(unsigned char)src->title[0];
+        char initial=(char)(isalpha(first)?toupper(first):'#');
+        if(letter[0]&&letter[0]!='*'&&toupper((unsigned char)letter[0])!=initial)continue;
+        if(search[0]&&!strcasestr(src->title,search))continue;
+        if(total++<offset || count>=per_page)continue;
+        char title[520],name[620],identifier[150],pageurl[750],direct[1200];
+        json_quote(src->title,title,sizeof title);
+        json_quote(src->filename,name,sizeof name);
+        json_quote(src->path,identifier,sizeof identifier);
+        json_quote(src->source_page,pageurl,sizeof pageurl);
+        json_quote(src->url,direct,sizeof direct);
+        int n=snprintf(body+used,sizeof body-used,
+           "%s{\"title\":%s,\"display_name\":%s,\"filename\":%s,\"platform\":\"%s\","
+           "\"source_kind\":\"archive-index\",\"availability\":\"unverified\",\"size\":%llu,"
+           "\"source_page\":%s,\"direct_url\":%s}",
+           count?",":"",title,name,identifier,platform,src->size,pageurl,direct);
+        if(n<0||(size_t)n>=sizeof body-used-120)break;
+        used+=(size_t)n;
+        count++;
+    }
+    used+=(size_t)snprintf(body+used,sizeof body-used,
+       "],\"total\":%u,\"has_next\":%s}",total,total>offset+count?"true":"false");
+    json(sock,200,body);
+}
 /* Source lists are compiled into the ELF. No browser leaves RetroVerse. */
 static void host_games(int sock,const char *url){
     char platform[32],letter[8],host[32];
@@ -655,6 +707,9 @@ static void host_games(int sock,const char *url){
     param(url,"letter",letter,sizeof letter);
     param(url,"host",host,sizeof host);
     if(!platform_ok(platform)){error(sock,400,"Unknown platform");return;}
+    if(!strcmp(host,"archive-ps1")||!strcmp(host,"archive-gc")){
+        archive_index_results(sock,url,host);return;
+    }
     const int is_archive=!strcmp(host,"archive");
     if(!is_archive && strcmp(host,"verified")){error(sock,400,"Unsupported source provider");return;}
     char body[65000];size_t used=(size_t)snprintf(body,sizeof body,
