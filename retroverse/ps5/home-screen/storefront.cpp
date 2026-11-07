@@ -259,7 +259,7 @@ static void free_resp(Response&r){std::free(r.data);r.data=nullptr;}
 static bool helper_status(){
  Response r=http("GET","/api/health",nullptr,2048);
  bool ok=r.http==200&&r.data&&std::strstr((char*)r.data,"\"ok\":true")&&
-          std::strstr((char*)r.data,"\"sha256_downloads\"");
+          std::strstr((char*)r.data,"\"torrent_bridge\"");
  free_resp(r);return ok;
 }
 static bool launch_helper(){
