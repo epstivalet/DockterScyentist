@@ -1,4 +1,4 @@
-name: Build RetroVerse PS5 Installable Native Store v0.8
+name: Build RetroVerse PS5 Installable Native Store v0.9
 on:
   workflow_dispatch:
   push:
@@ -26,7 +26,9 @@ jobs:
             https://github.com/ps5-payload-dev/pacbrew-repo/releases/download/v0.40.2/ps5-payload-dev.tar.gz
           echo "a85f65de418a8e6a898c6c3e3c870d50fff7618a200e4dd59ea9692af6ecec4d  /tmp/pacbrew.tar.gz" | sha256sum -c -
           sudo tar -xzf /tmp/pacbrew.tar.gz -C / opt/ps5-payload-sdk/target/user
-      - name: Compile proven PS5 helper with artwork proxy and GameCube
+      - name: Verify developer release downloads and pinned checksums
+        run: python3 retroverse/ps5/full/verify_sources.py
+      - name: Compile PS5 helper with TLS and SHA-256 verification
         env:
           PS5_PAYLOAD_SDK: /opt/ps5-payload-sdk
         run: |
@@ -51,7 +53,7 @@ jobs:
           cp retroverse/ps5/full/retroverse-ps5-store.elf \
             /tmp/rv-native-template/assets/retroverse-helper.elf
           test -s /tmp/rv-native-template/assets/catalog/GC.txt
-          test -s /tmp/rv-native-template/assets/catalog/HOST_GC.txt
+          test -f /tmp/rv-native-template/assets/catalog/HOST_GC.txt\n          test -s /tmp/rv-native-template/assets/catalog/HOST_GENESIS.txt
       - name: Configure existing RetroVerse title identity and icon
         run: |
           cd /tmp/rv-native-template
@@ -64,7 +66,7 @@ jobs:
           from pathlib import Path
           path=Path("sce_sys/param.json")
           p=json.loads(path.read_text())
-          p["contentVersion"]="01.000.802"
+          p["contentVersion"]="01.000.900"
           path.write_text(json.dumps(p,indent=2)+"\n")
           PY
           /usr/bin/python3 "$GITHUB_WORKSPACE/retroverse/ps5/home-screen/generate_icon.py" sce_sys/icon0.png
@@ -85,7 +87,7 @@ jobs:
           test -s dist/PPSA99873/sce_module/libc.prx
           test -s dist/PPSA99873/sce_sys/icon0.png
           test -s dist/PPSA99873/assets/retroverse-helper.elf
-          test -s dist/PPSA99873/assets/catalog/GC.txt
+          test -s dist/PPSA99873/assets/catalog/GC.txt\n          test -s dist/PPSA99873/assets/catalog/HOST_GENESIS.txt
           file dist/PPSA99873/eboot.bin
           # The old native title imported Pad/UserService at process-load time
           # and was rejected by this PS5 with CE-107750-0. Those are now
@@ -106,7 +108,7 @@ jobs:
           from pathlib import Path
           import zipfile
           app=Path('PPSA99873')
-          out=Path('RetroVerse-PS5-v0.8.2-Native-Store.zip')
+          out=Path('RetroVerse-PS5-v0.9-Native-Store.zip')
           with zipfile.ZipFile(out,'w',compression=zipfile.ZIP_DEFLATED,compresslevel=8) as f:
               for p in sorted(app.rglob('*')):
                   if p.is_file():f.write(p,p.as_posix())
@@ -118,12 +120,12 @@ jobs:
               assert needed <= set(f.namelist())
           print(out, out.stat().st_size)
           PY
-          sha256sum RetroVerse-PS5-v0.8.2-Native-Store.zip > SHA256SUMS
+          sha256sum RetroVerse-PS5-v0.9-Native-Store.zip > SHA256SUMS
       - name: Upload installable RetroVerse native storefront
         uses: actions/upload-artifact@v4
         with:
-          name: RetroVerse-PS5-v0.8.2-Native-Store
+          name: RetroVerse-PS5-v0.9-Native-Store
           path: |
-            /tmp/rv-native-template/dist/RetroVerse-PS5-v0.8.2-Native-Store.zip
+            /tmp/rv-native-template/dist/RetroVerse-PS5-v0.9-Native-Store.zip
             /tmp/rv-native-template/dist/SHA256SUMS
           if-no-files-found: error
